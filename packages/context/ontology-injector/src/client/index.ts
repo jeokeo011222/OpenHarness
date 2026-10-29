@@ -17,7 +17,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { OntologyIcon } from './OntologyIcon.tsx'
 import { Workbench } from './Workbench.tsx'
-import { en, zh, type LocaleDict } from './locales.ts'
+import { de, en, es, fr, ja, pt, ru, zh, type LocaleDict } from './locales.ts'
 
 const NS = 'ontology.panel'
 
@@ -39,7 +39,7 @@ const PANEL_ID = 'ontology'
  * @param ctx - Client root context with slots, locale, and remote merged in.
  */
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ontology-panel: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ontology-panel: dictionaries')
   const t = ctx.locale.bind(NS)
   const store = ctx.remote.ontologyStore
 
