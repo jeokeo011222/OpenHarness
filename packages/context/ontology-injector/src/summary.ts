@@ -8,16 +8,11 @@
  * Gracefully handles missing rdfs:label / rdfs:comment — every
  * entity falls back to its local name so the summary never
  * contains blank entries.
- *
- * NOTE: rdflib's published type definitions are stricter than
- * Harness strict mode accepts for Quad/Statement interop, so we
- * intentionally keep one `any` boundary at the rdflib call site
- * and use our own simple structs downstream.
  */
 
 import { writeFile, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { Store, parse as rdflibParse, namedNode } from 'rdflib'
+import { Store, parse as rdflibParse, namedNode, type NamedNode } from 'rdflib'
 
 /** A single extracted OWL class. */
 interface ExtractedClass {
@@ -59,24 +54,26 @@ function localNameOf(iri: string): string {
 }
 
 /** Read all value strings for (subject, predicate, *) as an array. */
-function matchValues(triples: Store, subject: unknown, predicate: unknown): string[] {
-  const quads = (triples as any).match(subject, predicate, null) as Array<{ object: { value: string } }>
-  return quads.map(q => q.object.value ?? '')
+function matchValues(triples: Store, subject: NamedNode, predicate: NamedNode): string[] {
+  return triples.match(subject, predicate, null).map(quad => quad.object.value)
 }
 
 /** Return the value of any single (subject, predicate, *) match, or empty string. */
-function anyValue(triples: Store, subject: unknown, predicate: unknown): string {
-  const value = (triples as any).any(subject, predicate, null) as { value: string } | null
-  return value?.value ?? ''
+function anyValue(triples: Store, subject: NamedNode, predicate: NamedNode): string {
+  return triples.match(subject, predicate, null)[0]?.object.value ?? ''
 }
 
-/** Parse Turtle text into a structured ontology summary. */
+/**
+ * Parse Turtle text into a structured ontology summary.
+ * @param turtle - the Turtle document.
+ * @param baseIri - base IRI for relative references.
+ * @returns the classes and properties found in the document.
+ */
 export function parseOntology(turtle: string, baseIri: string = 'http://example.org/ontology#'): ParsedOntology {
   const triples = new Store()
   rdflibParse(turtle, triples, baseIri, 'text/turtle')
 
-  const allQuads: Array<{ subject: { value: string }; predicate: { value: string }; object: { value: string } }>
-    = (triples as any).match(null, null, null)
+  const allQuads = triples.match(null, null, null)
 
   const classSubjects = new Set<string>()
   const propertySubjects = new Map<string, boolean>()
@@ -125,7 +122,12 @@ export function parseOntology(turtle: string, baseIri: string = 'http://example.
   return { classes, properties }
 }
 
-/** Render the parsed ontology into a Markdown summary. */
+/**
+ * Render the parsed ontology into a Markdown summary.
+ * @param domain - the business domain id shown in the heading.
+ * @param parsed - the classes and properties to render.
+ * @returns the Markdown summary ending with a newline.
+ */
 export function renderSummary(domain: string, parsed: ParsedOntology): string {
   const lines: string[] = []
   lines.push(`## 当前业务域：${domain}`)
@@ -166,7 +168,13 @@ export function renderSummary(domain: string, parsed: ParsedOntology): string {
   return lines.join('\n') + '\n'
 }
 
-/** Write the summary.md file and return the rendered string. */
+/**
+ * Write the summary.md file and return the rendered string.
+ * @param storePath - the ontology store root.
+ * @param domain - the business domain id.
+ * @param turtle - the live ontology Turtle.
+ * @returns the rendered Markdown summary.
+ */
 export async function generateSummary(storePath: string, domain: string, turtle: string): Promise<string> {
   const parsed = parseOntology(turtle)
   const rendered = renderSummary(domain, parsed)
@@ -175,7 +183,12 @@ export async function generateSummary(storePath: string, domain: string, turtle:
   return rendered
 }
 
-/** Return true if summary.md is missing or older than ontology.ttl. */
+/**
+ * Report whether the cached summary is stale.
+ * @param summaryPath - absolute path of the cached summary.md.
+ * @param ontologyPath - absolute path of the live ontology.ttl.
+ * @returns `true` when the summary is missing or older than the ontology.
+ */
 export async function summaryNeedsRefresh(summaryPath: string, ontologyPath: string): Promise<boolean> {
   let summaryStat
   try {

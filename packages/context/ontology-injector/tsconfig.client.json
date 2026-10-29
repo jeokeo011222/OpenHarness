@@ -6,18 +6,22 @@
     "tsBuildInfoFile": "lib/tsconfig.client.tsbuildinfo",
     "jsx": "react-jsx"
   },
-  "include": [
-    "src/client"
-  ],
-  "exclude": [
-    "src/index.ts",
-    "src/loader.ts",
-    "src/summary.ts",
-    "src/injector.ts",
-    "src/inference.ts"
+  "files": [
+    "src/types.ts",
+    "src/css-modules.d.ts",
+    "src/client/index.ts",
+    "src/client/face.ts",
+    "src/client/layout.ts",
+    "src/client/locales.ts",
+    "src/client/OntologyIcon.tsx",
+    "src/client/GraphCanvas.tsx",
+    "src/client/Inspector.tsx",
+    "src/client/VersionsPanel.tsx",
+    "src/client/Workbench.tsx"
   ],
   "references": [
     { "path": "../../../vendor/cordis" },
+    { "path": "../../api/remotes/tsconfig.client.json" },
     { "path": "../../client/locale/tsconfig.client.json" },
     { "path": "../../client/ui-slots" },
     { "path": "../../client/ui-sidebar" }

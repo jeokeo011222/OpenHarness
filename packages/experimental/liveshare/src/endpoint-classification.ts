@@ -42,6 +42,10 @@ export const VIEWER_ENDPOINT_CLASSES = {
   'llm/listProviders': 'reader-global-read', // the page lists providers
   'session/canOpenWorkspacePath': 'reader-global-read', // the page asks whether a path can be opened
   'session/modelCatalog': 'reader-global-read', // the page reads the model catalog
+  'ontologyStore/diffVersions': 'reader-global-read', // the page compares two stored ontology snapshots
+  'ontologyStore/graph': 'reader-global-read', // the page reads a domain's active graph
+  'ontologyStore/listDomains': 'reader-global-read', // the page lists registered ontology domains
+  'ontologyStore/listVersions': 'reader-global-read', // the page lists a domain's version snapshots
 
   // ── reader-session-read ─────────────────────────────────────────────────────────────
   'commands/list': 'reader-session-read', // the page lists slash commands for a visible Session (also granted globally)
@@ -222,6 +226,10 @@ export const VIEWER_ENDPOINT_CLASSES = {
   'schedule/update': 'owner-only', // owner schedules
   'subagents/interruptByParent': 'owner-only', // owner subagents
   'subagents/prompt': 'owner-only', // owner subagents
+  'ontologyStore/activateVersion': 'owner-only', // owner switches the active ontology snapshot
+  'ontologyStore/applyEdits': 'owner-only', // owner edits the shared ontology graph
+  'ontologyStore/createDomain': 'owner-only', // owner creates a shared ontology domain
+  'ontologyStore/generate': 'owner-only', // owner writes an ontology from an uploaded document
 
   // Owner share management stays on the owner's own page; a `share-viewer` Peer is refused first.
   'liveshareShares/audit': 'owner-only',

@@ -5,19 +5,26 @@
     "outDir": "lib/types",
     "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
   },
-  "include": [
+  "files": [
     "src/index.ts",
     "src/loader.ts",
     "src/summary.ts",
     "src/injector.ts",
-    "src/inference.ts"
+    "src/types.ts",
+    "src/model.ts",
+    "src/store.ts",
+    "src/extract.ts",
+    "src/generate.ts",
+    "src/pdfjs.d.ts"
   ],
   "references": [
     { "path": "../../../vendor/cordis" },
+    { "path": "../../../vendor/schemastery" },
     { "path": "../../llm/llm" },
     { "path": "../../core/agent" },
     { "path": "../../core/system-prompt" },
     { "path": "../../test-support/loader-smoke" },
-    { "path": "../../session/session-projection" }
+    { "path": "../../session/session-projection" },
+    { "path": "../../typert/protocol" }
   ]
 }

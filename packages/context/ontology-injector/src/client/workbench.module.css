@@ -1,0 +1,412 @@
+/* Ontology workbench layout and controls. Colors come from theme aliases only. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 20px 24px 24px;
+  gap: 16px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  overflow: auto;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.body {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+  min-height: 0;
+}
+
+.rail,
+.main,
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.side {
+  gap: 16px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.domainList,
+.versionList,
+.stepList,
+.diffList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.domainItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.domainItem:hover {
+  border-color: var(--dsw-alias-brand-primary);
+}
+
+.domainActive {
+  border-color: var(--dsw-alias-brand-primary);
+  background: var(--dsw-alias-bg-multi-select);
+}
+
+.domainName {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.domainMeta {
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.input,
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.button,
+.buttonPrimary {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.buttonPrimary {
+  border-color: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-brand-primary);
+}
+
+.button:disabled,
+.buttonPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.addSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.fileInput {
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.fileName {
+  margin: 0;
+  font-size: 12px;
+  word-break: break-all;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.errorBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  font-size: 12px;
+  background: var(--dsw-alias-bg-multi-select);
+}
+
+.graphWrap {
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  overflow: auto;
+  min-height: 360px;
+  max-height: 60vh;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: transparent;
+}
+
+.node {
+  cursor: grab;
+}
+
+.node rect {
+  stroke-width: 1;
+}
+
+.nodeClass rect {
+  fill: var(--dsw-alias-bg-base);
+  stroke: var(--dsw-alias-brand-primary);
+}
+
+.nodeProperty rect {
+  fill: var(--dsw-alias-bg-skeleton);
+  stroke: var(--dsw-alias-border-l2);
+}
+
+.nodeSelected rect {
+  stroke-width: 2;
+  stroke: var(--dsw-alias-label-primary);
+}
+
+.nodeLabel {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--dsw-alias-label-primary);
+}
+
+.nodeId {
+  font-size: 10px;
+  fill: var(--dsw-alias-label-tertiary);
+}
+
+.edge {
+  stroke-width: 1.4;
+  fill: none;
+}
+
+.edgeDomain {
+  stroke: var(--dsw-alias-brand-primary);
+}
+
+.edgeRange {
+  stroke: var(--dsw-alias-label-secondary);
+  stroke-dasharray: 4 3;
+}
+
+.edgeSubclass {
+  stroke: var(--dsw-alias-label-tertiary);
+  stroke-dasharray: 2 3;
+}
+
+.edgeSelected {
+  stroke-width: 2.4;
+}
+
+.edgeHit {
+  stroke: transparent;
+  stroke-width: 10;
+  cursor: pointer;
+}
+
+.edgeLabel {
+  font-size: 9px;
+  text-anchor: middle;
+  fill: var(--dsw-alias-label-tertiary);
+}
+
+.arrow {
+  fill: var(--dsw-alias-label-secondary);
+}
+
+.log {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.step {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.stepGlyph {
+  flex: none;
+  width: 12px;
+  color: var(--dsw-alias-brand-primary);
+}
+
+.inspector,
+.versions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+}
+
+.inspectorHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.source {
+  margin: 0;
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.versionItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+}
+
+.versionMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.versionName {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.versionMeta,
+.versionNote {
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary);
+  word-break: break-all;
+}
+
+.badge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--dsw-alias-brand-primary);
+  border: 1px solid var(--dsw-alias-brand-primary);
+}
+
+.compareRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.compareRow .input {
+  width: auto;
+}
+
+.diff {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.diffHead {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.diffBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.diffTitle {
+  font-size: 11px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.diffList li {
+  font-size: 11px;
+  word-break: break-all;
+  color: var(--dsw-alias-label-secondary);
+}

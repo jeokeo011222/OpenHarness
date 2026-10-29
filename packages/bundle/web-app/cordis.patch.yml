@@ -367,10 +367,14 @@
     - id: ui-workflow-run
       name: '@deepseek-ai/dsh-client-ui-workflow-run'
 
-    # Ontology Center: sidebar panel + main page listing business-domain
-    # catalog from ontology-store/ with one-shot CLI pipeline docs.
+    # Ontology center: the Host `ontologyStore` Remote service (domain listing,
+    # document-to-ontology generation, graph edits, version activation) plus
+    # the sidebar panel and workbench page. The single instance also owns the
+    # per-turn ontology summary injection.
     - id: ontology-panel
       name: '@deepseek-ai/dsh-ontology-injector'
+      config:
+        defaultDomain: contract
 
     # Input triggers: the '/' | '@' pipeline (ui-input-trigger), the command surface over
     # it (ui-commands), and the reference sources (ui-skill / ui-reference).

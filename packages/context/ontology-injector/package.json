@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-ontology-injector",
-  "description": "Injects OWL/RDF ontology summaries into agent context by business domain",
+  "description": "Injects OWL/RDF ontology summaries into agent context and hosts the ontology workbench Remote service",
   "version": "0.2.2-alpha.2",
   "publishConfig": {
     "access": "public"
@@ -18,9 +18,21 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./types": {
+      "types": "./lib/types/types.d.ts",
+      "default": "./lib/types/types.js"
+    },
     "./client": {
       "types": "./lib/types/client/index.d.ts",
       "default": "./lib/client.js"
+    },
+    "./typert": {
+      "types": "./lib/typert.host.d.ts",
+      "default": "./lib/typert.host.js"
+    },
+    "./remote": {
+      "types": "./lib/typert.remote-client.d.ts",
+      "default": "./lib/typert.remote-client.js"
     },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
@@ -28,20 +40,35 @@
   "files": [
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts",
+    "lib/typert.host.js",
+    "lib/typert.host.d.ts",
+    "lib/typert.remote-client.js",
+    "lib/typert.remote-client.d.ts"
   ],
   "dsh": {
     "client": {
+      "external": [
+        "@deepseek-ai/dsh-api-gateway/client"
+      ],
       "inject": [
+        "@deepseek-ai/dsh-api-gateway",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-sidebar"
       ],
       "platform": "web"
     }
   },
+  "scripts": {
+    "bundle": "tsdown",
+    "watch": "tsdown --watch"
+  },
   "license": "MIT",
   "dependencies": {
+    "@deepseek-ai/dsh-typert-protocol": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
+    "pdfjs-dist": "6.3.289",
     "rdflib": "^2.2.36",
     "zod": "4.4.3"
   },
@@ -56,6 +83,7 @@
     "@deepseek-ai/dsh-agent": "workspace:*",
     "@deepseek-ai/dsh-agent-loop": "workspace:*",
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:*",
+    "@deepseek-ai/dsh-api-remotes": "workspace:*",
     "@deepseek-ai/dsh-app-boot": "workspace:*",
     "@deepseek-ai/dsh-bash-local": "workspace:*",
     "@deepseek-ai/dsh-client-locale": "workspace:*",
@@ -70,6 +98,7 @@
     "@deepseek-ai/dsh-system-prompt": "workspace:*",
     "@deepseek-ai/dsh-tool-testkit": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
+    "@deepseek-ai/dsh-typert-registry": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   }

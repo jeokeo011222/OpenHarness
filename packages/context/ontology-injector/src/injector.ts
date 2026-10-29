@@ -34,7 +34,11 @@ interface ResolvedInjector {
   defaultDomain: string | undefined
 }
 
-/** Resolve defaults into a concrete config. */
+/**
+ * Resolve defaults into a concrete config.
+ * @param cfg - the plugin config with optional store path and default domain.
+ * @returns the absolute store path and the configured default domain.
+ */
 export function resolveInjectorConfig(cfg: InjectorConfig): ResolvedInjector {
   return {
     storePath: cfg.storePath ? resolve(cfg.storePath) : DEFAULT_STORE_PATH,
@@ -49,6 +53,9 @@ export function resolveInjectorConfig(cfg: InjectorConfig): ResolvedInjector {
  *   1. If summary.md exists and its mtime >= ontology.ttl mtime → read summary.md
  *   2. Otherwise re-run generateSummary (which writes summary.md + returns text)
  *   3. On load error (missing files) → undefined (skip injection, do not throw)
+ * @param storePath - the ontology store root.
+ * @param domain - the business domain id.
+ * @returns the summary text, or `undefined` when the domain cannot be loaded.
  */
 export async function fetchDomainSummary(
   storePath: string,
@@ -82,6 +89,9 @@ export async function fetchDomainSummary(
  * Wrap the summary in a `<system-reminder>` block identical to the format
  * described in the design document. This textual envelope is what the model
  * actually consumes — not raw RDF triples.
+ * @param summary - the rendered domain summary.
+ * @param domain - the business domain id shown in the heading.
+ * @returns the reminder block appended to the step request.
  */
 export function wrapInjection(summary: string, domain: string): string {
   return `<system-reminder>

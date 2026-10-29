@@ -29,7 +29,12 @@ function makeLoadError(kind: LoadError['kind'], path: string, message: string): 
   return error
 }
 
-/** Read registry.json and return the declared domain list. */
+/**
+ * Read registry.json and return the declared domain list.
+ * @param storePath - root ontology store directory.
+ * @returns the declared domain ids.
+ * @throws {LoadError} when the registry is missing, unreadable, or malformed.
+ */
 export async function listDomains(storePath: string): Promise<string[]> {
   const registryPath = join(resolve(storePath), 'registry.json')
   let raw: string
@@ -50,10 +55,10 @@ export async function listDomains(storePath: string): Promise<string[]> {
     throw makeLoadError('registry-missing', registryPath,
       `ontology-injector: registry.json at ${registryPath} missing "domains" field`)
   }
-  const domains = (parsed as { domains: unknown }).domains
-  if (!Array.isArray(domains) || !domains.every(d => typeof d === 'string')) {
+  const domains = parsed.domains
+  if (!Array.isArray(domains) || !domains.every((entry): entry is string => typeof entry === 'string')) {
     throw makeLoadError('registry-missing', registryPath,
-      `ontology-injector: registry.json "domains" must be a string array`)
+      'ontology-injector: registry.json "domains" must be a string array')
   }
   return domains
 }
@@ -72,6 +77,7 @@ export interface OntologySources {
  * Read the .ttl files for one business domain.
  * @param storePath - root ontology store directory (containing registry.json).
  * @param domain - business domain name, e.g. "contract".
+ * @returns the domain's ontology, optional shapes, and ontology path.
  * @throws {LoadError} when the directory or ontology.ttl is missing.
  */
 export async function loadOntology(storePath: string, domain: string): Promise<OntologySources> {

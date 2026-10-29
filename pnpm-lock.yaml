@@ -1561,6 +1561,9 @@ importers:
       '@deepseek-ai/dsh-office-to-pdf':
         specifier: workspace:*
         version: link:../../document/office-to-pdf
+      '@deepseek-ai/dsh-ontology-injector':
+        specifier: workspace:*
+        version: link:../../context/ontology-injector
       '@deepseek-ai/dsh-permission-presets':
         specifier: workspace:*
         version: link:../../interaction/permission-presets
@@ -7331,9 +7334,15 @@ importers:
 
   packages/context/ontology-injector:
     dependencies:
+      '@deepseek-ai/dsh-typert-protocol':
+        specifier: workspace:*
+        version: link:../../typert/protocol
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
+      pdfjs-dist:
+        specifier: 6.3.289
+        version: 6.3.289
       rdflib:
         specifier: ^2.2.36
         version: 2.4.1
@@ -7353,6 +7362,9 @@ importers:
       '@deepseek-ai/dsh-agent-loop-testkit':
         specifier: workspace:*
         version: link:../../test-support/agent-loop-testkit
+      '@deepseek-ai/dsh-api-remotes':
+        specifier: workspace:*
+        version: link:../../api/remotes
       '@deepseek-ai/dsh-app-boot':
         specifier: workspace:*
         version: link:../../boot/app-boot
@@ -7395,6 +7407,9 @@ importers:
       '@deepseek-ai/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
+      '@deepseek-ai/dsh-typert-registry':
+        specifier: workspace:*
+        version: link:../../typert/registry
       react:
         specifier: ^18.2.0
         version: 18.3.1
