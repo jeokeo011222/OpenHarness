@@ -1,0 +1,25 @@
+{
+  "extends": "../../../tsconfig.base.client.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.client.tsbuildinfo",
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "src/client"
+  ],
+  "exclude": [
+    "src/index.ts",
+    "src/loader.ts",
+    "src/summary.ts",
+    "src/injector.ts",
+    "src/inference.ts"
+  ],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../client/locale/tsconfig.client.json" },
+    { "path": "../../client/ui-slots" },
+    { "path": "../../client/ui-sidebar" }
+  ]
+}

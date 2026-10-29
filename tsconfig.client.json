@@ -168,6 +168,7 @@
     { "path": "./packages/api/workspace-files/tsconfig.client.json" },
     { "path": "./packages/client/web" },
     { "path": "./packages/context/file-reference" },
+    { "path": "./packages/context/ontology-injector/tsconfig.client.json" },
     { "path": "./apps/web" }
   ]
 }

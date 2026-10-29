@@ -367,6 +367,11 @@
     - id: ui-workflow-run
       name: '@deepseek-ai/dsh-client-ui-workflow-run'
 
+    # Ontology Center: sidebar panel + main page listing business-domain
+    # catalog from ontology-store/ with one-shot CLI pipeline docs.
+    - id: ontology-panel
+      name: '@deepseek-ai/dsh-ontology-injector/client'
+
     # Input triggers: the '/' | '@' pipeline (ui-input-trigger), the command surface over
     # it (ui-commands), and the reference sources (ui-skill / ui-reference).
     - id: ui-input-trigger
