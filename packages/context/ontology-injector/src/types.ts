@@ -51,7 +51,7 @@ export interface OntologyGraph {
   readonly turtle: string
 }
 
-/** One domain row in the domain rail. */
+/** One domain row in the ontology list. */
 export interface OntologyDomainSummary {
   readonly id: string
   readonly label: string
@@ -61,6 +61,16 @@ export interface OntologyDomainSummary {
   readonly edgeCount: number
   readonly updatedAt: string | null
   readonly sourceCount: number
+  /** A disabled domain stays readable but is never injected into a turn. */
+  readonly disabled: boolean
+}
+
+/** Fields a domain update may change; omitted fields keep their current value. */
+export interface DomainUpdate {
+  /** New display name; blank leaves the current label. */
+  readonly label?: string
+  /** Whether the domain takes part in per-turn injection. */
+  readonly disabled?: boolean
 }
 
 /** One version snapshot in the version timeline. */

@@ -8,6 +8,7 @@
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type {
   ApplyEditsResult,
+  DomainUpdate,
   GenerateRequest,
   GenerateResult,
   OntologyDomainSummary,
@@ -21,6 +22,7 @@ import type {
 export interface OntologyStoreFace {
   listDomains(): Promise<RemoteResult<OntologyDomainSummary[]>>
   createDomain(domain: string, label: string): Promise<RemoteResult<OntologyDomainSummary>>
+  updateDomain(domain: string, patch: DomainUpdate): Promise<RemoteResult<OntologyDomainSummary>>
   generate(request: GenerateRequest): Promise<RemoteResult<GenerateResult>>
   graph(domain: string): Promise<RemoteResult<OntologyGraph>>
   applyEdits(domain: string, edits: OntologyEdit[]): Promise<RemoteResult<ApplyEditsResult>>

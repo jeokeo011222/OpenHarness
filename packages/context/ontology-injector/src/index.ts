@@ -41,6 +41,7 @@ import {
 } from './store.ts'
 import type {
   ApplyEditsResult,
+  DomainUpdate,
   GenerateRequest,
   GenerateResult,
   GenerationStep,
@@ -176,6 +177,9 @@ export class OntologyStore extends TypertRemoteService {
       const domain = injector.defaultDomain
       if (domain === undefined) return decision
 
+      const meta = await readDomainMeta(this.storePath, domain)
+      if (meta.disabled) return decision
+
       const summary = await fetchDomainSummary(this.storePath, domain)
       if (summary === undefined) return decision
 
@@ -231,8 +235,41 @@ export class OntologyStore extends TypertRemoteService {
         createdAt: now,
         updatedAt: now,
         activeVersion: null,
+        disabled: false,
       })
       await writeLiveTurtle(this.storePath, domain, emitTurtle(emptyModel(domain)))
+    } finally {
+      this.writing.delete(domain)
+    }
+    return this.summarize(domain)
+  }
+
+  /**
+   * Rename a domain or toggle whether it takes part in per-turn injection.
+   *
+   * @param domain - registered domain id.
+   * @param patch - fields to change; omitted fields keep their current value.
+   * @returns the updated domain summary.
+   */
+  @Remote
+  async updateDomain(domain: string, patch: DomainUpdate): Promise<OntologyDomainSummary> {
+    this.requireIdle(domain)
+    if (!await domainExists(this.storePath, domain)) {
+      throw new RemoteError('ontology/not-found', `Domain not found: ${domain}`, { domain })
+    }
+    const meta = await readDomainMeta(this.storePath, domain)
+    const label = typeof patch.label === 'string' ? patch.label.trim() : ''
+    const disabled = typeof patch.disabled === 'boolean' ? patch.disabled : meta.disabled
+    this.writing.add(domain)
+    try {
+      await writeDomainMeta(this.storePath, {
+        id: domain,
+        label: label.length > 0 ? label : meta.label,
+        createdAt: meta.createdAt,
+        updatedAt: new Date().toISOString(),
+        activeVersion: meta.activeVersion,
+        disabled,
+      })
     } finally {
       this.writing.delete(domain)
     }
@@ -318,6 +355,7 @@ export class OntologyStore extends TypertRemoteService {
         createdAt: meta.createdAt || now,
         updatedAt: now,
         activeVersion: version,
+        disabled: meta.disabled,
       })
       steps.push({ stage: 'version', message: `Snapshot created: ${version}`, status: 'done' })
 
@@ -381,6 +419,7 @@ export class OntologyStore extends TypertRemoteService {
         createdAt: meta.createdAt || now,
         updatedAt: now,
         activeVersion: version,
+        disabled: meta.disabled,
       })
       return { graph: toGraph(edited, domain, meta.label, version), version, warnings }
     } catch (error) {
@@ -458,6 +497,7 @@ export class OntologyStore extends TypertRemoteService {
         createdAt: meta.createdAt,
         updatedAt: new Date().toISOString(),
         activeVersion: version,
+        disabled: meta.disabled,
       })
       return toGraph(parseTurtle(turtle, domain), domain, meta.label, version)
     } finally {
@@ -509,6 +549,7 @@ export class OntologyStore extends TypertRemoteService {
       createdAt: now,
       updatedAt: now,
       activeVersion: null,
+      disabled: false,
     })
     return false
   }
@@ -547,6 +588,7 @@ export class OntologyStore extends TypertRemoteService {
       edgeCount,
       updatedAt: meta.updatedAt.length > 0 ? meta.updatedAt : null,
       sourceCount: sources.length,
+      disabled: meta.disabled,
     }
   }
 }

@@ -21,6 +21,8 @@ export interface DomainMeta {
   readonly createdAt: string
   readonly updatedAt: string
   readonly activeVersion: string | null
+  /** A disabled domain is listed and readable but never injected. */
+  readonly disabled: boolean
 }
 
 /** One immutable version snapshot. */
@@ -100,7 +102,7 @@ export async function writeRegistry(root: string, domains: readonly string[]): P
 export async function readDomainMeta(root: string, domain: string): Promise<DomainMeta> {
   const path = join(domainDirOf(root, domain), 'domain.json')
   if (!existsSync(path)) {
-    return { id: domain, label: domain, createdAt: '', updatedAt: '', activeVersion: null }
+    return { id: domain, label: domain, createdAt: '', updatedAt: '', activeVersion: null, disabled: false }
   }
   const raw: unknown = JSON.parse(await readFile(path, 'utf8'))
   const record = raw !== null && typeof raw === 'object' ? raw as Record<string, unknown> : {}
@@ -111,6 +113,7 @@ export async function readDomainMeta(root: string, domain: string): Promise<Doma
     createdAt: typeof record.createdAt === 'string' ? record.createdAt : '',
     updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : '',
     activeVersion: active,
+    disabled: typeof record.disabled === 'boolean' ? record.disabled : false,
   }
 }
 

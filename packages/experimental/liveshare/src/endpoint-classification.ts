@@ -230,6 +230,7 @@ export const VIEWER_ENDPOINT_CLASSES = {
   'ontologyStore/applyEdits': 'owner-only', // owner edits the shared ontology graph
   'ontologyStore/createDomain': 'owner-only', // owner creates a shared ontology domain
   'ontologyStore/generate': 'owner-only', // owner writes an ontology from an uploaded document
+  'ontologyStore/updateDomain': 'owner-only', // owner renames or disables a shared ontology domain
 
   // Owner share management stays on the owner's own page; a `share-viewer` Peer is refused first.
   'liveshareShares/audit': 'owner-only',

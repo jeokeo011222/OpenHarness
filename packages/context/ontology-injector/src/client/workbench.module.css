@@ -31,15 +31,47 @@
   color: var(--dsw-alias-label-secondary);
 }
 
-.body {
+.tabs {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.tab {
+  padding: 6px 14px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tabActive {
+  border-color: var(--dsw-alias-brand-primary);
+  background: var(--dsw-alias-bg-multi-select);
+  color: var(--dsw-alias-label-primary);
+  font-weight: 600;
+}
+
+.listBody,
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.graphBody {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 16px;
   align-items: start;
   min-height: 0;
 }
 
-.rail,
 .main,
 .side {
   display: flex;
@@ -78,33 +110,69 @@
   gap: 8px;
 }
 
-.domainItem {
+.domainRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+}
+
+.domainRowMain {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  width: 100%;
-  padding: 10px 12px;
-  text-align: left;
-  cursor: pointer;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
+  min-width: 0;
+  flex: 1;
 }
 
-.domainItem:hover {
-  border-color: var(--dsw-alias-brand-primary);
-}
-
-.domainActive {
-  border-color: var(--dsw-alias-brand-primary);
-  background: var(--dsw-alias-bg-multi-select);
+.domainActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .domainName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 13px;
   font-weight: 600;
+}
+
+.statusDisabled {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.toolbarMain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .domainMeta {

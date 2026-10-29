@@ -34,11 +34,14 @@ function stepGlyph(status: GenerationStep['status']): string {
 }
 
 /**
- * Domain rail, upload-and-generate form, graph canvas, inspector, and versions.
+ * Two-tab ontology center: the domain list with create/rename/disable actions,
+ * and the graph workbench with upload-and-generate, the canvas, the inspector,
+ * and the version timeline.
  *
  * @param props - Remote face and copy.
  */
 export function Workbench({ store, t }: WorkbenchProps): ReactNode {
+  const [tab, setTab] = useState<'ontologies' | 'graph'>('ontologies')
   const [domains, setDomains] = useState<OntologyDomainSummary[]>([])
   const [activeDomain, setActiveDomain] = useState<string | null>(null)
   const [graph, setGraph] = useState<OntologyGraph | null>(null)
@@ -54,6 +57,8 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
   const [draftId, setDraftId] = useState('')
   const [draftLabel, setDraftLabel] = useState('')
   const [creating, setCreating] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editLabel, setEditLabel] = useState('')
 
   const activeSummary = domains.find(item => item.id === activeDomain) ?? null
 
@@ -107,6 +112,11 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
     setError(messageOf(failure))
   }
 
+  const reloadGraph = async (domain: string): Promise<void> => {
+    setGraph(unwrap(await store.graph(domain)))
+    setVersions(unwrap(await store.listVersions(domain)))
+  }
+
   const createDomain = async (): Promise<void> => {
     const id = draftId.trim()
     if (id.length === 0) return
@@ -120,11 +130,54 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
       setDraftId('')
       setDraftLabel('')
       setCreating(false)
+      setTab('graph')
     } catch (failure) {
       report(failure)
     } finally {
       setBusy(null)
     }
+  }
+
+  const beginEdit = (domain: OntologyDomainSummary): void => {
+    setEditingId(domain.id)
+    setEditLabel(domain.label)
+  }
+
+  const submitEdit = async (): Promise<void> => {
+    if (editingId === null) return
+    const label = editLabel.trim()
+    if (label.length === 0) return
+    setBusy(`update:${editingId}`)
+    setError(null)
+    try {
+      await store.updateDomain(editingId, { label })
+      await refreshDomains()
+      if (activeDomain === editingId) await reloadGraph(editingId)
+      setEditingId(null)
+      setEditLabel('')
+    } catch (failure) {
+      report(failure)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const toggleDisabled = async (domain: OntologyDomainSummary): Promise<void> => {
+    setBusy(`update:${domain.id}`)
+    setError(null)
+    try {
+      await store.updateDomain(domain.id, { disabled: !domain.disabled })
+      await refreshDomains()
+    } catch (failure) {
+      report(failure)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const viewDomain = (domain: OntologyDomainSummary): void => {
+    setActiveDomain(domain.id)
+    setTab('graph')
   }
 
   const pickFile = async (file: File | undefined): Promise<void> => {
@@ -231,30 +284,98 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
         </div>
       )}
 
-      <div className={styles.body}>
-        <aside className={styles.rail}>
-          <h3 className={styles.sectionTitle}>{t('domains')}</h3>
+      <div className={styles.tabs} role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'ontologies'}
+          className={`${styles.tab}${tab === 'ontologies' ? ` ${styles.tabActive}` : ''}`}
+          onClick={() => { setTab('ontologies') }}
+        >
+          {t('tabOntologies')}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'graph'}
+          className={`${styles.tab}${tab === 'graph' ? ` ${styles.tabActive}` : ''}`}
+          onClick={() => { setTab('graph') }}
+        >
+          {t('tabGraph')}
+        </button>
+      </div>
+
+      {tab === 'ontologies' && (
+        <section className={styles.listBody}>
           {domains.length === 0
             ? <p className={styles.hint}>{t('noDomains')}</p>
             : (
               <ul className={styles.domainList}>
                 {domains.map(domain => (
-                  <li key={domain.id}>
-                    <button
-                      type="button"
-                      className={`${styles.domainItem}${domain.id === activeDomain ? ` ${styles.domainActive}` : ''}`}
-                      onClick={() => { setActiveDomain(domain.id) }}
-                    >
-                      <span className={styles.domainName}>{domain.label}</span>
+                  <li key={domain.id} className={styles.domainRow}>
+                    <div className={styles.domainRowMain}>
+                      {editingId === domain.id
+                        ? (
+                          <input
+                            className={styles.input}
+                            value={editLabel}
+                            onChange={(event) => { setEditLabel(event.target.value) }}
+                          />
+                        )
+                        : (
+                          <span className={styles.domainName}>
+                            {domain.label}
+                            {domain.disabled && <span className={styles.statusDisabled}>{t('statusDisabled')}</span>}
+                          </span>
+                        )}
                       <span className={styles.domainMeta}>
+                        {domain.id}
+                        {' · '}
                         {domain.version === null ? '' : `${t('versionPrefix')}${domain.version} · `}
                         {domain.nodeCount} {t('nodeCount')} · {domain.edgeCount} {t('edgeCount')} · {domain.versionCount} {t('versionCount')}
                       </span>
-                    </button>
+                    </div>
+                    <div className={styles.domainActions}>
+                      {editingId === domain.id
+                        ? (
+                          <>
+                            <button
+                              type="button"
+                              className={styles.buttonPrimary}
+                              disabled={busy !== null || editLabel.trim().length === 0}
+                              onClick={() => { void submitEdit() }}
+                            >
+                              {busy === `update:${domain.id}` ? t('saving') : t('save')}
+                            </button>
+                            <button type="button" className={styles.button} onClick={() => { setEditingId(null) }}>{t('cancel')}</button>
+                          </>
+                        )
+                        : (
+                          <>
+                            <button type="button" className={styles.button} onClick={() => { viewDomain(domain) }}>
+                              {t('view')}
+                            </button>
+                            <button type="button" className={styles.button} onClick={() => { beginEdit(domain) }}>
+                              {t('edit')}
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.button}
+                              disabled={busy !== null}
+                              onClick={() => { void toggleDisabled(domain) }}
+                            >
+                              {busy === `update:${domain.id}`
+                                ? t('saving')
+                                : domain.disabled ? t('enable') : t('disable')}
+                            </button>
+                          </>
+                        )}
+                    </div>
                   </li>
                 ))}
               </ul>
             )}
+          <p className={styles.hint}>{t('disableHint')}</p>
 
           <div className={styles.addSection}>
             {creating
@@ -278,99 +399,121 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
                 </div>
               )
               : (
-                <button type="button" className={styles.button} onClick={() => { setCreating(true) }}>{t('newDomain')}</button>
+                <button type="button" className={styles.buttonPrimary} onClick={() => { setCreating(true) }}>{t('newDomain')}</button>
               )}
           </div>
+        </section>
+      )}
 
-          {activeDomain !== null && (
-            <div className={styles.addSection}>
-              <h3 className={styles.sectionTitle}>{t('upload')}</h3>
-              <p className={styles.hint}>{t('uploadHint')}</p>
-              <input
-                className={styles.fileInput}
-                type="file"
-                accept=".docx,.pdf,.md,.markdown,.txt"
-                onChange={(event) => { void pickFile(event.target.files?.[0]) }}
-              />
-              {fileName.length > 0 && <p className={styles.fileName}>{fileName}</p>}
-              <button
-                type="button"
-                className={styles.buttonPrimary}
-                disabled={busy !== null || contentBase64.length === 0}
-                onClick={() => { void generate() }}
-              >
-                {busy === 'generate' ? t('generating') : t('generate')}
-              </button>
-              <p className={styles.hint}>{t('generateHint')}</p>
-            </div>
-          )}
-        </aside>
-
-        <main className={styles.main}>
-          <h3 className={styles.sectionTitle}>{t('graph')}</h3>
-          <p className={styles.hint}>{t('graphHint')}</p>
-          {graph === null || graph.nodes.length === 0
-            ? <p className={styles.hint}>{t('graphEmpty')}</p>
+      {tab === 'graph' && (
+        <section className={styles.panel}>
+          {activeDomain === null || activeSummary === null
+            ? <p className={styles.hint}>{t('selectDomain')}</p>
             : (
-              <div className={styles.graphWrap}>
-                <GraphCanvas
-                  key={graphSignature}
-                  graph={graph}
-                  selectedId={selectedId}
-                  onSelect={setSelectedId}
-                />
-              </div>
+              <>
+                <div className={styles.toolbar}>
+                  <div className={styles.toolbarMain}>
+                    <h3 className={styles.sectionTitle}>
+                      {activeSummary.label}
+                      {activeSummary.disabled && <span className={styles.statusDisabled}>{t('statusDisabled')}</span>}
+                    </h3>
+                    <span className={styles.domainMeta}>
+                      {activeSummary.version === null ? '' : `${t('versionPrefix')}${activeSummary.version} · `}
+                      {activeSummary.nodeCount} {t('nodeCount')} · {activeSummary.edgeCount} {t('edgeCount')}
+                    </span>
+                  </div>
+                  <div className={styles.toolbarActions}>
+                    <input
+                      className={styles.fileInput}
+                      type="file"
+                      accept=".docx,.pdf,.md,.markdown,.txt"
+                      onChange={(event) => { void pickFile(event.target.files?.[0]) }}
+                    />
+                    <button
+                      type="button"
+                      className={styles.buttonPrimary}
+                      disabled={busy !== null || contentBase64.length === 0}
+                      onClick={() => { void generate() }}
+                    >
+                      {busy === 'generate' ? t('generating') : t('generate')}
+                    </button>
+                    <button type="button" className={styles.button} onClick={() => { setTab('ontologies') }}>
+                      {t('tabOntologies')}
+                    </button>
+                  </div>
+                </div>
+                {fileName.length > 0 && <p className={styles.fileName}>{fileName}</p>}
+                <p className={styles.hint}>{t('uploadHint')}</p>
+                <p className={styles.hint}>{t('graphHint')}</p>
+
+                <div className={styles.graphBody}>
+                  <main className={styles.main}>
+                    {graph === null || graph.nodes.length === 0
+                      ? <p className={styles.hint}>{t('graphEmpty')}</p>
+                      : (
+                        <div className={styles.graphWrap}>
+                          <GraphCanvas
+                            key={graphSignature}
+                            graph={graph}
+                            selectedId={selectedId}
+                            onSelect={setSelectedId}
+                          />
+                        </div>
+                      )}
+
+                    {(steps.length > 0 || warnings.length > 0) && (
+                      <div className={styles.log}>
+                        {steps.length > 0 && (
+                          <>
+                            <h4 className={styles.sectionTitle}>{t('steps')}</h4>
+                            <ul className={styles.stepList}>
+                              {steps.map((step, index) => (
+                                <li key={`${step.stage}-${index}`} className={styles.step}>
+                                  <span className={styles.stepGlyph}>{stepGlyph(step.status)}</span>
+                                  <span>{step.message}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                        {warnings.length > 0 && (
+                          <>
+                            <h4 className={styles.sectionTitle}>{t('warnings')}</h4>
+                            <ul className={styles.stepList}>
+                              {warnings.map((warning, index) => (
+                                <li key={`warn-${index}`} className={styles.step}>{warning}</li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </main>
+
+                  <div className={styles.side}>
+                    <Inspector
+                      key={`inspector:${selectedId ?? 'none'}`}
+                      graph={graph ?? { domain: '', label: '', namespace: '', version: null, nodes: [], edges: [], turtle: '' }}
+                      selectedId={selectedId}
+                      busy={busy !== null}
+                      t={t}
+                      onApply={(edits) => { void applyEdits(edits) }}
+                    />
+                    <VersionsPanel
+                      key={`versions:${versionsSignature}`}
+                      versions={versions}
+                      diff={diff}
+                      busyVersion={busy !== null && busy.startsWith('activate:') ? busy.slice('activate:'.length) : null}
+                      t={t}
+                      onActivate={(version) => { void activate(version) }}
+                      onCompare={(from, to) => { void compare(from, to) }}
+                    />
+                  </div>
+                </div>
+              </>
             )}
-
-          {(steps.length > 0 || warnings.length > 0) && (
-            <div className={styles.log}>
-              {steps.length > 0 && (
-                <>
-                  <h4 className={styles.sectionTitle}>{t('steps')}</h4>
-                  <ul className={styles.stepList}>
-                    {steps.map((step, index) => (
-                      <li key={`${step.stage}-${index}`} className={styles.step}>
-                        <span className={styles.stepGlyph}>{stepGlyph(step.status)}</span>
-                        <span>{step.message}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-              {warnings.length > 0 && (
-                <>
-                  <h4 className={styles.sectionTitle}>{t('warnings')}</h4>
-                  <ul className={styles.stepList}>
-                    {warnings.map((warning, index) => (
-                      <li key={`warn-${index}`} className={styles.step}>{warning}</li>
-                    ))}
-                  </ul>
-                </>
-              )}
-            </div>
-          )}
-        </main>
-
-        <div className={styles.side}>
-          <Inspector
-            key={`inspector:${selectedId ?? 'none'}`}
-            graph={graph ?? { domain: '', label: '', namespace: '', version: null, nodes: [], edges: [], turtle: '' }}
-            selectedId={selectedId}
-            busy={busy !== null}
-            t={t}
-            onApply={(edits) => { void applyEdits(edits) }}
-          />
-          <VersionsPanel
-            key={`versions:${versionsSignature}`}
-            versions={versions}
-            diff={diff}
-            busyVersion={busy !== null && busy.startsWith('activate:') ? busy.slice('activate:'.length) : null}
-            t={t}
-            onActivate={(version) => { void activate(version) }}
-            onCompare={(from, to) => { void compare(from, to) }}
-          />
-        </div>
-      </div>
+        </section>
+      )}
     </div>
   )
 }
