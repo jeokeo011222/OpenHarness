@@ -40,14 +40,11 @@ const COLLAPSE_SETTLE_MS = 150
  */
 const SCROLLBAR_LINGER_MS = 2000
 
-/** Format complete-build metadata for the local brand badge. */
+/** Build version badge is intentionally hidden. Returns undefined so the
+ *  brand row always renders the clean OpenHarness identity without
+ *  version/commit suffix or click-to-copy affordance. */
 function localBuildVersion(): string | undefined {
-  const version = process.env.DSH_CLIENT_VERSION
-  if (version === undefined) return undefined
-  const commit = process.env.DSH_CLIENT_COMMIT_HASH
-  return version
-    + (commit === undefined ? '' : `-${commit}`)
-    + (process.env.DSH_CLIENT_GIT_DIRTY === 'true' ? '-dirty' : '')
+  return undefined
 }
 
 type PanelRowProps =
