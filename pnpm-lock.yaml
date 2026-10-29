@@ -3218,6 +3218,9 @@ importers:
       '@deepseek-ai/dsh-office-to-pdf':
         specifier: workspace:*
         version: link:../../document/office-to-pdf
+      '@deepseek-ai/dsh-ontology-injector':
+        specifier: workspace:*
+        version: link:../../context/ontology-injector
       '@deepseek-ai/dsh-persona':
         specifier: workspace:*
         version: link:../../preset/persona

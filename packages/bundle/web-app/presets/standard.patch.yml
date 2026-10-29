@@ -12,6 +12,10 @@
             name: '@deepseek-ai/dsh-persona'
             config:
               prefix: You are a coding agent powered by the {{model}} model.
+          - id: ontology-injector
+            name: '@deepseek-ai/dsh-ontology-injector'
+            config:
+              defaultDomain: contract
           - id: agent-instructions
             name: '@deepseek-ai/dsh-agent-instructions'
             config:
