@@ -144,6 +144,9 @@ export function apply(ctx: ClientContext): void {
       'settings.models.footer': { kind: 'list', scope: 'root' },
     },
   }, ModelsSection))
+  // WelcomeNotice now returns null unconditionally — see WelcomeNotice.tsx.
+  // The slot remains registered so existing slot queries/test expectations
+  // still hold, but the dialog never mounts on first launch.
   if (!('dshDesktop' in globalThis)) ctx.slots.inject('settings.onboarding', () => ctx.slots.register({
     name: 'settings.onboarding',
     id: 'welcome-notice',

@@ -101,9 +101,6 @@ Openharness/
 
 ## ❓ FAQ
 
-**Q: Is OpenHarness production-ready?**
-OpenHarness is in **developer preview**. APIs are pre-stable, and breaking changes are expected between versions. Review the upgrade guide for each release before upgrading.
-
 **Q: Which model providers are supported?**
 Any provider with an OpenAI-compatible endpoint works out of the box via the DeepSeek SDK surface. Native providers and remote BFF adapters live in `packages/llm/`.
 
