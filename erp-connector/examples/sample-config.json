@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "defaultAdapterByFamily": {
+    "yonyou": "yonyou-u8-v13",
+    "kingdee": "kingdee-cloud-galaxy"
+  },
+  "mappings": [
+    {
+      "domain": "contract",
+      "action": "queryPurchaseOrders",
+      "erp": "yonyou",
+      "api": "u8_purchase_order_query",
+      "params": [
+        { "from": "region", "to": "cRegion", "transform": { "kind": "identity" } },
+        { "from": "status", "to": "cStatus", "transform": { "kind": "enum_map", "map": { "未交货": "0", "部分交货": "1", "已交货": "2" } } },
+        { "from": "date", "to": "dDate", "transform": { "kind": "date_format", "format": "YYYYMMDD" } }
+      ]
+    },
+    {
+      "domain": "contract",
+      "action": "savePurchaseOrder",
+      "erp": "yonyou",
+      "api": "u8_purchase_order_save",
+      "params": [
+        { "from": "orderData", "to": "sXml", "transform": { "kind": "identity" } }
+      ]
+    },
+    {
+      "domain": "contract",
+      "action": "querySalesOrders",
+      "erp": "kingdee",
+      "api": "k3_sales_order_query",
+      "params": [
+        { "from": "custId", "to": "cust_id", "transform": { "kind": "identity" } }
+      ]
+    }
+  ]
+}

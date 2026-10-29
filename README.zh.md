@@ -1,95 +1,125 @@
-# DeepSeek Harness
+<p align="center">
+  <img src="./apps/web/public/logo.png" alt="OpenHarness" width="180" />
+  <br />
+  <strong>Ontology OpenHarness</strong>
+</p>
 
-[English](README.md) | 中文
+<p align="center">
 
-DeepSeek Harness（`dsh`）是由 [DeepSeek AI](https://deepseek.com) 开发的开源 agent harness（智能体框架）。
+[![Node.js](https://img.shields.io/badge/Node.js-≥24.9.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![pnpm](https://img.shields.io/badge/pnpm-11.28+-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/jeokeo011222/Openharness/pulls)
+[![GitHub stars](https://img.shields.io/github/stars/jeokeo011222/Openharness?style=social)](https://github.com/jeokeo011222/Openharness/stargazers)
 
-它构建于**一切皆插件**的架构之上，由 [Cordis](https://github.com/cordiverse/cordis) 驱动，其设计参见论文 [_A Programming Paradigm for Spatiotemporal Composability_](https://arxiv.org/abs/2608.25512)。
+</p>
 
-文档：[https://deepseek-harness.github.io/deepseek-harness/](https://deepseek-harness.github.io/deepseek-harness/)
+<p align="center">
 
-## 开发者预览
+**以插件为核心的智能体运行时，本体知识注入 + ERP 连接器开箱即用。**
 
-DeepSeek Harness 处于 _开发者预览_ 阶段，正在快速迭代。**未来将出现破坏兼容性的变更。**
+[English](README.md) · 中文
 
-运行本项目前，请阅读[安全说明](SAFETY.zh.md)。
+</p>
 
-<a id="run"></a>
+---
 
-## 运行
+## ✨ 为什么选择 OpenHarness
 
-### 通过 `npm` 运行
+每一个 AI 智能体都受限于上下文窗口。**本体 OpenHarness** 在运行时将 **结构化业务知识** 注入到智能体循环中——以 Turtle 语法解析 OWL/RDF 本体摘要，并通过嵌入式 OWL RL 推理增强——让智能体真正知道：有哪些实体、它们之间是什么关系、在你的 ERP 里去哪里调用它们。
 
-安装 `Node.js`，然后运行：
+运行时基于 **Cordis** 插件架构：每个能力都是注册 effect，每个声明都可组合，每个扩展点都不触及智能体循环源码。
+
+## 🔥 核心特性
+
+| 能力 | 它能做什么 |
+|------|-----------|
+| 🧩 **插件优先架构** | 插槽（slots）、瀑布监听器、服务、会话投影——全部通过 `ctx.effect()` 注册。扩展行为 = 加插件，不改 agent-loop。 |
+| 📚 **本体注入器** | 按业务域（合同、采购……）解析 Turtle OWL/RDF，自动提取类 + 属性，在 pre-step 时注入智能体上下文。 |
+| 🧠 **OWL RL 推理** | 嵌入式五规则推理器（子类传递、domain/range、TransitiveProperty 等），单次最长 5 秒，返回增强后的知识图谱。 |
+| 🔌 **ERP 连接器** | Zod 配置校验 + 适配器注册表 + 值转换器管道。内置 **用友 U8（v13/v15）** 和 **金蝶云·星空** 适配器骨架。 |
+| 🖥️ **映射编辑器** | React + Vite 可视化编辑器，本体行动 ↔ ERP API 映射，内联转换器参数编辑 + 实时 JSON 预览。 |
+| 🧭 **双端 UI** | Web（默认 `http://127.0.0.1:3080`）+ Desktop（Electron），共用一套 client 包。 |
+| 🐍 **Python SDK** | TypeScript 智能体循环的会话投影镜像——相同的 `SessionEventMap`、相同的 expected outputs、相同的持久化格式。 |
+| 🔐 **安全优先** | 插件级沙箱、凭据边界、会话格式版本化、本体发布 SHACL 双重校验、首次运行前强制安全提示。 |
+
+## 🚀 快速开始
+
+### 环境要求
+
+- Node.js ≥ **24.9.0**
+- pnpm ≥ **11.28**
+
+### 安装运行
 
 ```sh
-npx @deepseek-ai/dsh web
-```
-
-该命令默认会在 `http://127.0.0.1:3080` 启动 Web UI，本机启动时还会用默认浏览器打开页面。通过 SSH 启动时只打印宿主机 URL，因为本地转发地址由 SSH 客户端或编辑器持有。传入 `--no-open` 可仅运行服务器而不打开浏览器。详见 [Web UI 指南](docs/user/guide/index.zh.md)。
-
-<a id="run-from-source"></a>
-
-### 从源码运行
-
-如需从仓库源码运行：
-
-```sh
-git clone https://github.com/deepseek-ai/deepseek-harness.git
-cd deepseek-harness
+git clone https://github.com/jeokeo011222/Openharness.git
+cd Openharness
 pnpm install
 pnpm run build
-pnpm dsh web
+pnpm run dev:web          # http://127.0.0.1:3080
 ```
 
-`pnpm run build` 会准备仓库产物。`pnpm dsh web` 会直接使用这些已构建产物，不会重新构建。
+如果你已经有 API Key，一条命令即可：
 
-## 社区与支持
-
-- 通过 [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions) 提交反馈或 bug 报告。
-- 为你的插件仓库添加 [`dsh-plugin`](https://github.com/topics/dsh-plugin) 话题，便于被发现。
-- 欢迎加入 DeepSeek Harness 企微群！扫描下方二维码填写入群问卷，小助手会定期发送入群邀请。
-
-<table>
-  <thead>
-    <tr>
-      <th align="center">入群问卷</th>
-      <th align="center">微信公众号</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="center"><a href="https://trtgsjkv6r.feishu.cn/share/base/form/shrcnIt5twSVdLGD52KJBckGCgg"><img src="https://cdn.deepseek.com/harness/readme/community-wecom-survey.png" alt="DeepSeek Harness 入群问卷二维码" width="180" height="180"></a></td>
-      <td align="center"><img src="https://cdn.deepseek.com/harness/readme/community-wechat-official-account.png" alt="DeepSeek Harness 团队微信公众号二维码" width="180" height="180"></td>
-    </tr>
-  </tbody>
-</table>
-
-## 参与贡献
-
-参见 [CONTRIBUTING.md](CONTRIBUTING.zh.md)。
-
-## 开发
-
-请先阅读[开发指南](docs/development.zh.md)与[架构文档](docs/architecture.zh.md)。
-
-`pnpm run dev:web` 会在一个终端里完成构建、启动，并在源码修改时重建 client bundle；`make help` 列出 Web 与 Desktop 对应的 Make target。完整表格见开发指南的「应用命令」一节。
-
-面向 agent：请遵循 [AGENTS.md](AGENTS.md)。
-
-## 引用
-
-```bibtex
-@misc{deepseek-harness2026,
-  title={DeepSeek Harness: Everything is a Plugin},
-  author={DeepSeek-AI},
-  year={2026},
-  publisher={GitHub},
-  howpublished={\url{https://github.com/deepseek-ai/deepseek-harness}},
-}
+```sh
+DEEPSEEK_API_KEY=... pnpm dsh web
 ```
 
-## 许可证
+## 📂 仓库结构
+
+```
+Openharness/
+├── apps/
+│   ├── web/              # Vite + React Web 前端
+│   └── desktop/          # Electron 桌面壳
+├── packages/             # 50+ workspace 包，按能力分组
+│   ├── core/             # Agent / Session API
+│   ├── llm/              # 模型提供方
+│   ├── shell/ | subprocess/ | ssh/ | terminal/
+│   ├── fs/ | web/ | browser-use/ | computer-use/
+│   ├── ontology-injector/   # 🆕 OWL/RDF → 智能体上下文 + 推理
+│   ├── ...               # subagent、compaction、guard、session、mcp…
+│   └── experimental/     # 未获产品承诺的实验性能力
+├── erp-connector/        # 🆕 独立 ERP 路由包（用友 / 金蝶适配器）
+├── erp-mapping-editor/   # 🆕 React + Vite 可视化映射编辑器
+├── ontology-store/       # 🆕 本体 registry + versions/ + candidates/ 目录规范
+├── vendor/               # 内置 Cordis 源码
+├── native/               # Node addon 系统
+└── website/              # VitePress 文档站
+```
+
+## 🛠️ 技术栈
+
+- [Cordis](https://github.com/cordiverse/cordis) — 时空可组合运行时
+- [TypeScript](https://www.typescriptlang.org/) `strict: true`，全程 ESM
+- [rdflib](https://github.com/linkeddata/rdflib.js) — 嵌入式 RDF/OWL 解析 + 五规则 OWL RL 推理
+- [Zod](https://zod.dev/) + [Schemastery](https://github.com/cordiverse/schemastery) — 配置校验
+- [Vite](https://vite.dev/) + [Electron](https://www.electronjs.org/) — 双端前端栈
+- [pnpm workspaces](https://pnpm.io/workspaces) — Monorepo
+
+## ❓ 常见问题
+
+**Q: OpenHarness 可以用于生产环境吗？**
+当前处于 **开发者预览阶段**，公开 API 不稳定，版本间存在破坏性变更。升级前请查看对应版本的 Upgrade Guide。
+
+**Q: 支持哪些模型提供方？**
+任何支持 OpenAI 兼容协议的端点都能直接使用，通过 DeepSeek SDK 表面接入。原生提供方和远程 BFF 适配器位于 `packages/llm/`。
+
+**Q: 不用本体和 ERP 功能可以吗？**
+可以——本体插件和 ERP 连接器都是可选模块。基础 harness 提供插件优先的智能体/会话原语和完整的双端 UI 栈。
+
+**Q: ERP 数据存在哪里？**
+OpenHarness 不存储任何 ERP 记录。连接器是无状态路由层，全权委托给已配置的适配器。凭据只存在本地 `cordis.yml` overlay 中，不会被提交。
+
+## 🤝 贡献
+
+开发约定、门禁、插件编写指南详见 [CONTRIBUTING.md](CONTRIBUTING.md)。插件、适配器、文档修正——所有贡献均欢迎。
+
+> 每个插件声明都通过 `ctx.effect()` 注册；每个能力都是服务定义 + 服务提供方 + 消费方三件套，绝不藏单例。
+
+## 📄 许可证
 
 [MIT](LICENSE)
 

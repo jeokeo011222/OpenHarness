@@ -1,0 +1,46 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix proc: <http://example.org/ontology/procurement#> .
+
+proc:PurchaseOrder a owl:Class ;
+    rdfs:label "采购订单" ;
+    rdfs:comment "买方向卖方发出的正式采购请求" .
+
+proc:Supplier a owl:Class ;
+    rdfs:label "供应商" ;
+    rdfs:comment "提供货物或服务的外部主体" .
+
+proc:Item a owl:Class ;
+    rdfs:label "采购品项" ;
+    rdfs:comment "采购订单中的具体货物或服务条目" .
+
+proc:approver a owl:Class ;
+    rdfs:label "审批人" ;
+    rdfs:comment "有权审批采购订单的内部人员" .
+
+proc:hasSupplier a owl:ObjectProperty ;
+    rdfs:label "供应商" ;
+    rdfs:domain proc:PurchaseOrder ;
+    rdfs:range proc:Supplier .
+
+proc:containsItem a owl:ObjectProperty ;
+    rdfs:label "包含品项" ;
+    rdfs:domain proc:PurchaseOrder ;
+    rdfs:range proc:Item .
+
+proc:approvedBy a owl:ObjectProperty ;
+    rdfs:label "审批人" ;
+    rdfs:domain proc:PurchaseOrder ;
+    rdfs:range proc:approver .
+
+proc:orderNumber a owl:DatatypeProperty ;
+    rdfs:label "订单编号" ;
+    rdfs:domain proc:PurchaseOrder ;
+    rdfs:range xsd:string .
+
+proc:totalAmount a owl:DatatypeProperty ;
+    rdfs:label "订单总额" ;
+    rdfs:domain proc:PurchaseOrder ;
+    rdfs:range xsd:decimal .

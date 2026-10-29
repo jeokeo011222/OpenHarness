@@ -1,6 +1,6 @@
 {
-  "name": "DeepSeek Harness",
-  "short_name": "DSH",
+  "name": "Ontology OpenHarness",
+  "short_name": "OpenHarness",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

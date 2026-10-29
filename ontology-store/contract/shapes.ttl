@@ -1,0 +1,24 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix contract: <http://example.org/ontology/contract#> .
+
+contract:ContractShape
+    a sh:NodeShape ;
+    sh:targetClass contract:Contract ;
+    sh:property [
+        sh:path contract:contractTitle ;
+        sh:datatype rdf:langString ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+    ] ;
+    sh:property [
+        sh:path contract:hasParty ;
+        sh:minCount 2 ;
+    ] .
+
+contract:PartyShape
+    a sh:NodeShape ;
+    sh:targetClass contract:Party ;
+    sh:closed false .

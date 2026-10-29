@@ -1,76 +1,125 @@
-# DeepSeek Harness
+<p align="center">
+  <img src="./apps/web/public/logo.png" alt="OpenHarness" width="180" />
+  <br />
+  <strong>Ontology OpenHarness</strong>
+</p>
 
-English | [中文](README.zh.md)
+<p align="center">
 
-DeepSeek Harness (`dsh`) is an open-source agent harness developed by [DeepSeek AI](https://deepseek.com).
+[![Node.js](https://img.shields.io/badge/Node.js-≥24.9.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![pnpm](https://img.shields.io/badge/pnpm-11.28+-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/jeokeo011222/Openharness/pulls)
+[![GitHub stars](https://img.shields.io/github/stars/jeokeo011222/Openharness?style=social)](https://github.com/jeokeo011222/Openharness/stargazers)
 
-It is built on an **everything-is-a-plugin** architecture and powered by [Cordis](https://github.com/cordiverse/cordis), whose design is described in [_A Programming Paradigm for Spatiotemporal Composability_](https://arxiv.org/abs/2608.25512).
+</p>
 
-Documentation: [https://deepseek-harness.github.io/deepseek-harness/](https://deepseek-harness.github.io/deepseek-harness/)
+<p align="center">
 
-## Developer preview
+**A plugin-first agent harness with ontology-powered context injection and ERP connectors.**
 
-DeepSeek Harness is in _developer preview_ and iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.**
+English · [中文](README.zh.md)
 
-Review the [safety notice](SAFETY.md) before running the project.
+</p>
 
-## Run
+---
 
-### Run from `npm`
+## ✨ Why OpenHarness
 
-Install `Node.js`, then run:
+Every AI agent is context-limited. Ontology OpenHarness injects **structured business knowledge** into the agent loop at runtime — as Turtle-parsed OWL/RDF summaries, augmented by lightweight OWL RL inference — so your agent knows *what* entities exist, *how* they relate, and *where* to call them in your ERP.
+
+Built on **Cordis**, an everything-is-a-plugin runtime where every capability is an effect, every declaration is composable, and every surface is extensible without changing the agent loop itself.
+
+## 🔥 Core Features
+
+| Capability | What it does |
+|------------|--------------|
+| 🧩 **Plugin-First Architecture** | Every seam — slots, waterfall listeners, services, projections — is a registered effect. No agent-loop code changes to extend behavior. |
+| 📚 **Ontology Injector** | Parse Turtle OWL/RDF per business domain (contracts, procurement…), summarize classes + properties, inject into agent context at pre-step. |
+| 🧠 **OWL RL Inference** | Five-rule embedded reasoner (subclass transitivity, domain/range, TransitiveProperty…) runs in 5 s max and augments the injected summary. |
+| 🔌 **ERP Connector** | Standalone Node router with Zod schema, adapter registry, and transformer pipeline. Ships skeletons for **Yonyou U8 (v13/v15)** and **Kingdee Cloud Galaxy**. |
+| 🖥️ **Mapping Editor** | React + Vite visual editor pairing ontology actions ↔ ERP API mappings with inline transformer specs and live JSON preview. |
+| 🧭 **Dual UI** | Web (`http://127.0.0.1:3080`) and Desktop (Electron) frontends, sharing a single client package set. |
+| 🐍 **Python SDK** | Session-projected mirror of the TypeScript agent loop — same `SessionEventMap`, same expected outputs, same persistence format. |
+| 🔐 **Safety First** | Plugin-level sandbox, credential boundary, session format versioning, SHACL double-verify for ontology publishes, and an explicit safety notice before first run. |
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js ≥ **24.9.0**
+- pnpm ≥ **11.28**
+
+### Install & Run
 
 ```sh
-npx @deepseek-ai/dsh web
-```
-
-The command starts the Web UI at `http://127.0.0.1:3080` by default and opens it in the default browser for a local launch. An SSH launch only prints the host URL because the SSH client or editor owns the local forwarded address. Pass `--no-open` to run the server without opening a browser. See [Web UI guide](docs/user/guide/index.md).
-
-### Run from source
-
-To run from a repository checkout:
-
-```sh
-git clone https://github.com/deepseek-ai/deepseek-harness.git
-cd deepseek-harness
+git clone https://github.com/jeokeo011222/Openharness.git
+cd Openharness
 pnpm install
 pnpm run build
-pnpm dsh web
+pnpm run dev:web          # http://127.0.0.1:3080
 ```
 
-`pnpm run build` prepares the repository artifacts. `pnpm dsh web` uses those built artifacts without rebuilding.
+One-command alternative if you already have a key:
 
-## Community and support
-
-- Submit feedback or bug reports through [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).
-- Add the [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic to your plugin repository for discoverability.
-- Join <a href="https://discord.gg/4MrtZUhpxg">DeepSeek Harness Discord community</a>.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Development
-
-Start with the [development guide](docs/development.md) and [architecture documentation](docs/architecture.md).
-
-`pnpm run dev:web` builds, serves, and rebuilds client bundles on source edits in one terminal, and `make help` lists the matching Make targets for Web and Desktop; the guide's application commands section owns the full table.
-
-For agents, follow [AGENTS.md](AGENTS.md).
-
-## Citation
-
-```bibtex
-@misc{deepseek-harness2026,
-  title={DeepSeek Harness: Everything is a Plugin},
-  author={DeepSeek-AI},
-  year={2026},
-  publisher={GitHub},
-  howpublished={\url{https://github.com/deepseek-ai/deepseek-harness}},
-}
+```sh
+DEEPSEEK_API_KEY=... pnpm dsh web
 ```
 
-## License
+## 📂 Monorepo Layout
+
+```
+Openharness/
+├── apps/
+│   ├── web/              # Vite + React web client
+│   └── desktop/          # Electron desktop wrapper
+├── packages/             # 50+ workspace packages, grouped by concern
+│   ├── core/             # Agent/session API
+│   ├── llm/              # Model providers
+│   ├── shell/ | subprocess/ | ssh/ | terminal/
+│   ├── fs/ | web/ | browser-use/ | computer-use/
+│   ├── ontology-injector/   # 🆕 OWL/RDF → agent context + inference
+│   ├── ...               # subagent, compaction, guard, session, mcp…
+│   └── experimental/     # capabilities without product-support commitment
+├── erp-connector/        # 🆕 Standalone ERP router package (Yonyou / Kingdee adapters)
+├── erp-mapping-editor/   # 🆕 React + Vite visual mapping editor
+├── ontology-store/       # 🆕 Ontology registry + versions/ + candidates/ layout
+├── vendor/               # Vendored Cordis source
+├── native/               # Node addon system
+└── website/              # VitePress documentation
+```
+
+## 🛠️ Built With
+
+- [Cordis](https://github.com/cordiverse/cordis) — spatiotemporal composability runtime
+- [TypeScript](https://www.typescriptlang.org/) `strict: true`, ESM everywhere
+- [rdflib](https://github.com/linkeddata/rdflib.js) — embedded RDF/OWL parser + 5-rule OWL RL inference
+- [Zod](https://zod.dev/) + [Schemastery](https://github.com/cordiverse/schemastery) — config validation
+- [Vite](https://vite.dev/) + [Electron](https://www.electronjs.org/) — dual-frontend stack
+- [pnpm workspaces](https://pnpm.io/workspaces) — monorepo
+
+## ❓ FAQ
+
+**Q: Is OpenHarness production-ready?**
+OpenHarness is in **developer preview**. APIs are pre-stable, and breaking changes are expected between versions. Review the upgrade guide for each release before upgrading.
+
+**Q: Which model providers are supported?**
+Any provider with an OpenAI-compatible endpoint works out of the box via the DeepSeek SDK surface. Native providers and remote BFF adapters live in `packages/llm/`.
+
+**Q: Can I use OpenHarness without the ontology or ERP features?**
+Yes — the ontology plugin and ERP connector are optional modules. The base harness ships with plugin-first agent/session primitives and the full dual UI stack.
+
+**Q: Where does my ERP data live?**
+OpenHarness does not store ERP records. The connector is a stateless router that delegates to configured adapters. Credentials stay in local `cordis.yml` overlays, never committed.
+
+## 🤝 Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development conventions, gates, and the plugin authoring guide. All contributions — plugins, adapters, documentation fixes — are welcome.
+
+> Every new plugin declaration goes through `ctx.effect()`; every capability is a service definition + service provider + consumer, never a hidden singleton.
+
+## 📄 License
 
 [MIT](LICENSE)
 

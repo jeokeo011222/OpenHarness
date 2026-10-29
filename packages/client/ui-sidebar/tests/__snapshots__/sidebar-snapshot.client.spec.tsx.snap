@@ -532,7 +532,7 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
                 <span
                   class="localBuildTitle"
                 >
-                  DSH 本地构建
+                  OpenHarness
                 </span>
                 <span
                   class="buildVersion"
