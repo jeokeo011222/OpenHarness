@@ -3,38 +3,47 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-settings-account/README.md
 /:
-  en: 13d891a226092817
-  zh: 90bf6ff56dd3c096
+  en: 9abc178ca2367a17
+  zh: 3708ce107ee4db05
 /deepseek-ai-dsh-client-ui-settings-account:
-  en: 9ff7ac2d70f70b59
-  zh: ded522c4cfd6e040
+  en: f4c9934dbb7d3bc8
+  zh: 0fd8e51031bbe4a3
 /deepseek-ai-dsh-client-ui-settings-account/summary:
-  en: 54da65ea807d7af1
-  zh: 359f85d16724d71d
+  en: 48419daba95bba7c
+  zh: 29b02ae664fa1542
 /deepseek-ai-dsh-client-ui-settings-account/table-of-contents:
-  en: c26f81e8adf0128b
-  zh: e11ab371f51f66bc
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
 /deepseek-ai-dsh-client-ui-settings-account/use-this-package:
-  en: 2e63a8b01d800894
-  zh: 42db1f28e2ddb2a3
-/deepseek-ai-dsh-client-ui-settings-account/use-this-package/desktop-onboarding:
-  en: 7ae4e68f9491b068
-  zh: f7478269bf8d28b3
+  en: 1cab7c83a26eaacd
+  zh: c4705290c24df6c6
+/deepseek-ai-dsh-client-ui-settings-account/use-this-package/the-admin-workbench:
+  en: b2d9924f2ba12508
+  zh: d2235f1211ca9f2e
+/deepseek-ai-dsh-client-ui-settings-account/use-this-package/access:
+  en: 0e9f60e6fb970ecc
+  zh: 0a794d6b70e8aff7
 /deepseek-ai-dsh-client-ui-settings-account/understand-the-implementation:
-  en: 186b2046cfb5ef76
-  zh: 57b042a618fb612e
+  en: 56d91a12191c1dff
+  zh: 19cfc7e7dba6ca87
+/deepseek-ai-dsh-client-ui-settings-account/understand-the-implementation/source-map:
+  en: a3e2d985235e1360
+  zh: ff6df16d0696e0c6
+/deepseek-ai-dsh-client-ui-settings-account/understand-the-implementation/session-probe-and-guards:
+  en: d354f6323555e9b9
+  zh: 456a1b4da37ce772
 /deepseek-ai-dsh-client-ui-settings-account/further-exploration:
-  en: f5ca95916ef486dc
-  zh: 1e238d8299e0d838
+  en: 354c434e7463a282
+  zh: 616b35cae9b9f8ce
 /deepseek-ai-dsh-client-ui-settings-account/model-experience:
-  en: ee1df7ca3467ee3f
-  zh: 84904a5148da3862
+  en: d25c1971d7416af7
+  zh: 67507d0bfdd2213a
 /deepseek-ai-dsh-client-ui-settings-account/model-experience/kv-cache-effect:
   en: ca3015e252db0114
-  zh: ebca9253cf15e8e9
+  zh: 4bc2f564df7095eb
 /deepseek-ai-dsh-client-ui-settings-account/known-limitations-and-deferred-work:
-  en: 7afbd3f7afc20bd8
-  zh: f54c57e3d6738c7c
+  en: affad488020070d5
+  zh: 235b8440e4d6313a
 /deepseek-ai-dsh-client-ui-settings-account/known-limitations-and-deferred-work/dev-note:
-  en: ebc93259d9f494e2
-  zh: dcc679e43cdbd594
+  en: 43c8b9043fe3ef12
+  zh: 6ac1c99050b3a31d
