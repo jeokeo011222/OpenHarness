@@ -1,3 +1,7 @@
+# Ontology OpenHarness
+
+English | [中文](README.zh.md)
+
 <p align="center">
   <img src="./apps/web/public/logo.png" alt="OpenHarness" width="180" />
   <br />
@@ -6,20 +10,13 @@
 
 <p align="center">
 
-[![Node.js](https://img.shields.io/badge/Node.js-≥24.9.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![pnpm](https://img.shields.io/badge/pnpm-11.28+-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/jeokeo011222/Openharness/pulls)
-[![GitHub stars](https://img.shields.io/github/stars/jeokeo011222/Openharness?style=social)](https://github.com/jeokeo011222/Openharness/stargazers)
+[![Node.js](https://img.shields.io/badge/Node.js-≥24.9.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/) [![pnpm](https://img.shields.io/badge/pnpm-11.28+-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/) [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/jeokeo011222/Openharness/pulls) [![GitHub stars](https://img.shields.io/github/stars/jeokeo011222/Openharness?style=social)](https://github.com/jeokeo011222/Openharness/stargazers)
 
 </p>
 
 <p align="center">
 
 **A plugin-first agent harness with ontology-powered context injection and ERP connectors.**
-
-English · [中文](README.zh.md)
 
 </p>
 
@@ -84,7 +81,7 @@ Openharness/
 │   └── experimental/     # capabilities without product-support commitment
 ├── erp-connector/        # 🆕 Standalone ERP router package (Yonyou / Kingdee adapters)
 ├── erp-mapping-editor/   # 🆕 React + Vite visual mapping editor
-├── ontology-store/       # 🆕 Ontology registry + versions/ + candidates/ layout
+├── ontology-store/       # 🆕 Embedded RDF graph database (graph.db.nq) + uploaded sources
 ├── vendor/               # Vendored Cordis source
 ├── native/               # Node addon system
 └── website/              # VitePress documentation
@@ -94,6 +91,7 @@ Openharness/
 
 - [Cordis](https://github.com/cordiverse/cordis) — spatiotemporal composability runtime
 - [TypeScript](https://www.typescriptlang.org/) `strict: true`, ESM everywhere
+- [oxigraph](https://github.com/oxigraph/oxigraph) — embedded RDF graph database holding ontologies
 - [rdflib](https://github.com/linkeddata/rdflib.js) — embedded RDF/OWL parser + 5-rule OWL RL inference
 - [Zod](https://zod.dev/) + [Schemastery](https://github.com/cordiverse/schemastery) — config validation
 - [Vite](https://vite.dev/) + [Electron](https://www.electronjs.org/) — dual-frontend stack
@@ -101,14 +99,11 @@ Openharness/
 
 ## ❓ FAQ
 
-**Q: Which model providers are supported?**
-Any provider with an OpenAI-compatible endpoint works out of the box via the DeepSeek SDK surface. Native providers and remote BFF adapters live in `packages/llm/`.
+**Q: Which model providers are supported?** Any provider with an OpenAI-compatible endpoint works out of the box via the DeepSeek SDK surface. Native providers and remote BFF adapters live in `packages/llm/`.
 
-**Q: Can I use OpenHarness without the ontology or ERP features?**
-Yes — the ontology plugin and ERP connector are optional modules. The base harness ships with plugin-first agent/session primitives and the full dual UI stack.
+**Q: Can I use OpenHarness without the ontology or ERP features?** Yes — the ontology plugin and ERP connector are optional modules. The base harness ships with plugin-first agent/session primitives and the full dual UI stack.
 
-**Q: Where does my ERP data live?**
-OpenHarness does not store ERP records. The connector is a stateless router that delegates to configured adapters. Credentials stay in local `cordis.yml` overlays, never committed.
+**Q: Where does my ERP data live?** OpenHarness does not store ERP records. The connector is a stateless router that delegates to configured adapters. Credentials stay in local `cordis.yml` overlays, never committed.
 
 ## 🤝 Contributing
 

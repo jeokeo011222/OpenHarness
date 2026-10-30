@@ -1,3 +1,7 @@
+# Ontology OpenHarness
+
+[English](README.md) | 中文
+
 <p align="center">
   <img src="./apps/web/public/logo.png" alt="OpenHarness" width="180" />
   <br />
@@ -6,20 +10,13 @@
 
 <p align="center">
 
-[![Node.js](https://img.shields.io/badge/Node.js-≥24.9.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![pnpm](https://img.shields.io/badge/pnpm-11.28+-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/jeokeo011222/Openharness/pulls)
-[![GitHub stars](https://img.shields.io/github/stars/jeokeo011222/Openharness?style=social)](https://github.com/jeokeo011222/Openharness/stargazers)
+[![Node.js](https://img.shields.io/badge/Node.js-≥24.9.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/) [![pnpm](https://img.shields.io/badge/pnpm-11.28+-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/) [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/jeokeo011222/Openharness/pulls) [![GitHub stars](https://img.shields.io/github/stars/jeokeo011222/Openharness?style=social)](https://github.com/jeokeo011222/Openharness/stargazers)
 
 </p>
 
 <p align="center">
 
 **以插件为核心的智能体运行时，本体知识注入 + ERP 连接器开箱即用。**
-
-[English](README.md) · 中文
 
 </p>
 
@@ -51,6 +48,8 @@
 - Node.js ≥ **24.9.0**
 - pnpm ≥ **11.28**
 
+<a id="install--run"></a>
+
 ### 安装运行
 
 ```sh
@@ -72,28 +71,29 @@ DEEPSEEK_API_KEY=... pnpm dsh web
 ```
 Openharness/
 ├── apps/
-│   ├── web/              # Vite + React Web 前端
-│   └── desktop/          # Electron 桌面壳
-├── packages/             # 50+ workspace 包，按能力分组
-│   ├── core/             # Agent / Session API
-│   ├── llm/              # 模型提供方
+│   ├── web/              # Vite + React web client
+│   └── desktop/          # Electron desktop wrapper
+├── packages/             # 50+ workspace packages, grouped by concern
+│   ├── core/             # Agent/session API
+│   ├── llm/              # Model providers
 │   ├── shell/ | subprocess/ | ssh/ | terminal/
 │   ├── fs/ | web/ | browser-use/ | computer-use/
-│   ├── ontology-injector/   # 🆕 OWL/RDF → 智能体上下文 + 推理
-│   ├── ...               # subagent、compaction、guard、session、mcp…
-│   └── experimental/     # 未获产品承诺的实验性能力
-├── erp-connector/        # 🆕 独立 ERP 路由包（用友 / 金蝶适配器）
-├── erp-mapping-editor/   # 🆕 React + Vite 可视化映射编辑器
-├── ontology-store/       # 🆕 本体 registry + versions/ + candidates/ 目录规范
-├── vendor/               # 内置 Cordis 源码
-├── native/               # Node addon 系统
-└── website/              # VitePress 文档站
+│   ├── ontology-injector/   # 🆕 OWL/RDF → agent context + inference
+│   ├── ...               # subagent, compaction, guard, session, mcp…
+│   └── experimental/     # capabilities without product-support commitment
+├── erp-connector/        # 🆕 Standalone ERP router package (Yonyou / Kingdee adapters)
+├── erp-mapping-editor/   # 🆕 React + Vite visual mapping editor
+├── ontology-store/       # 🆕 Embedded RDF graph database (graph.db.nq) + uploaded sources
+├── vendor/               # Vendored Cordis source
+├── native/               # Node addon system
+└── website/              # VitePress documentation
 ```
 
 ## 🛠️ 技术栈
 
 - [Cordis](https://github.com/cordiverse/cordis) — 时空可组合运行时
 - [TypeScript](https://www.typescriptlang.org/) `strict: true`，全程 ESM
+- [oxigraph](https://github.com/oxigraph/oxigraph) — 承载本体的嵌入式 RDF 图数据库
 - [rdflib](https://github.com/linkeddata/rdflib.js) — 嵌入式 RDF/OWL 解析 + 五规则 OWL RL 推理
 - [Zod](https://zod.dev/) + [Schemastery](https://github.com/cordiverse/schemastery) — 配置校验
 - [Vite](https://vite.dev/) + [Electron](https://www.electronjs.org/) — 双端前端栈
@@ -101,21 +101,17 @@ Openharness/
 
 ## ❓ 常见问题
 
-**Q: OpenHarness 可以用于生产环境吗？**
-当前处于 **开发者预览阶段**，公开 API 不稳定，版本间存在破坏性变更。升级前请查看对应版本的 Upgrade Guide。
+**Q: OpenHarness 可以用于生产环境吗？** 当前处于 **开发者预览阶段**，公开 API 不稳定，版本间存在破坏性变更。升级前请查看对应版本的 Upgrade Guide。
 
-**Q: 支持哪些模型提供方？**
-任何支持 OpenAI 兼容协议的端点都能直接使用，通过 DeepSeek SDK 表面接入。原生提供方和远程 BFF 适配器位于 `packages/llm/`。
+**Q: 支持哪些模型提供方？** 任何支持 OpenAI 兼容协议的端点都能直接使用，通过 DeepSeek SDK 表面接入。原生提供方和远程 BFF 适配器位于 `packages/llm/`。
 
-**Q: 不用本体和 ERP 功能可以吗？**
-可以——本体插件和 ERP 连接器都是可选模块。基础 harness 提供插件优先的智能体/会话原语和完整的双端 UI 栈。
+**Q: 不用本体和 ERP 功能可以吗？** 可以——本体插件和 ERP 连接器都是可选模块。基础 harness 提供插件优先的智能体/会话原语和完整的双端 UI 栈。
 
-**Q: ERP 数据存在哪里？**
-OpenHarness 不存储任何 ERP 记录。连接器是无状态路由层，全权委托给已配置的适配器。凭据只存在本地 `cordis.yml` overlay 中，不会被提交。
+**Q: ERP 数据存在哪里？** OpenHarness 不存储任何 ERP 记录。连接器是无状态路由层，全权委托给已配置的适配器。凭据只存在本地 `cordis.yml` overlay 中，不会被提交。
 
 ## 🤝 贡献
 
-开发约定、门禁、插件编写指南详见 [CONTRIBUTING.md](CONTRIBUTING.md)。插件、适配器、文档修正——所有贡献均欢迎。
+开发约定、门禁、插件编写指南详见 [CONTRIBUTING.zh.md](CONTRIBUTING.zh.md)。插件、适配器、文档修正——所有贡献均欢迎。
 
 > 每个插件声明都通过 `ctx.effect()` 注册；每个能力都是服务定义 + 服务提供方 + 消费方三件套，绝不藏单例。
 

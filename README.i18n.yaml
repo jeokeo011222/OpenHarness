@@ -2,33 +2,36 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write README.md
-/deepseek-harness:
-  en: f68c4f080ce55ff2
-  zh: 88a76d7f7f0b260e
-/deepseek-harness/developer-preview:
-  en: 4ef4d8a71ac143f0
-  zh: 1bfc3149ba8e5543
-/deepseek-harness/run:
-  en: 4e0248e4c6474fc6
-  zh: eb2fb8d78c7d6bc0
-/deepseek-harness/run/run-from-npm:
-  en: e22005cd42e6cbad
-  zh: 0f536f4208df1d60
-/deepseek-harness/run/run-from-source:
-  en: 819e3f7c144d0d64
-  zh: de815f040975dba7
-/deepseek-harness/community-and-support:
-  en: 20acf6451fdc869b
-  zh: d06246dd019ecef7
-/deepseek-harness/contributing:
-  en: cabc2d3e9f8898bd
-  zh: 83b6d238bae29ce3
-/deepseek-harness/development:
-  en: 803ca2b11b497bed
-  zh: 8b4071eb0e7783ef
-/deepseek-harness/citation:
-  en: 6704e9e5a8d49a91
-  zh: 85c9cdd8d56f8e9d
-/deepseek-harness/license:
-  en: 926995344fc1c72b
-  zh: c92fab5abf85932f
+/ontology-openharness:
+  en: b184a48698177ab3
+  zh: 93f4bbc416b7910f
+/ontology-openharness/why-openharness:
+  en: d3236966bff67e6f
+  zh: ef384f492352e4d5
+/ontology-openharness/core-features:
+  en: 8a90fc49ba3149fe
+  zh: 6d2fd72a942fbbc6
+/ontology-openharness/quick-start:
+  en: 8ec74775c35e8133
+  zh: 041de6b4cd4d0f81
+/ontology-openharness/quick-start/prerequisites:
+  en: 24ab104a19daa1fc
+  zh: 7f92cebeff0ee670
+/ontology-openharness/quick-start/install-run:
+  en: 4b671523867e0a18
+  zh: d7032c16fdad6ba1
+/ontology-openharness/monorepo-layout:
+  en: 2adf41379bf0c5ef
+  zh: af157ae6dc821300
+/ontology-openharness/built-with:
+  en: af5afd848a528dc2
+  zh: fe35fd43277ca46f
+/ontology-openharness/faq:
+  en: 9556b54c25799257
+  zh: fe1a3f4ffec7863a
+/ontology-openharness/contributing:
+  en: 2742237a13a8ec3f
+  zh: 41ec2be2d9034660
+/ontology-openharness/license:
+  en: d92c9d0d1f4ae5f4
+  zh: fd2748aad96d5631
