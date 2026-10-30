@@ -29,6 +29,7 @@ import type {
   ConnectionRpcResult,
   ConnectionRequestRejection,
   ConnectionTrustRequest,
+  ConnectionIdentity,
   HostConnectionHandle,
   HostConnectionRpc,
 } from './rpc.ts'
@@ -63,6 +64,8 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Host Connection transport and RPC registrations. */
     connection: HostConnectionHandle
+    /** Optional Host identity provider for signed non-owner browser sessions. */
+    connectionIdentity?: ConnectionIdentity
   }
 }
 
@@ -129,11 +132,18 @@ export class HostConnectionService extends Service implements HostConnectionHand
   admit(request: ConnectionTrustRequest): PeerAdmission {
     if (!this.isTrusted(request)) return { rejection: 403 }
     if (this.disposed) return { rejection: 401 }
+    const identityPeer = this.identityPeer(request)
+    if (identityPeer !== undefined) return { peer: identityPeer }
     const secure = this.owner.get('webServer')?.protocol === 'https:'
     if (this.browserAuth.isAuthenticated(request, secure)) return { peer: this.browserPeer }
     const id = this.browserAuth.authenticateApi(request, secure)
     const record = id === undefined ? undefined : this.peers.get(id)
     return record === undefined ? { rejection: 401 } : { peer: record.peer }
+  }
+
+  /** Resolve the Peer a mounted identity provider claims for this request. */
+  identityPeer(request: ConnectionTrustRequest): PeerScope | undefined {
+    return this.owner.get('connectionIdentity')?.peerFor(request)
   }
 
   /** Create one in-process Peer owned by the Context that read this service. */

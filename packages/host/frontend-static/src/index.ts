@@ -137,6 +137,10 @@ export function apply(ctx: Context, config: Config): void {
   // the 401 through a writeHead/end response; capture it as a Fetch response.
   // The answer stays a 401 unless Connection writes another one.
   const authorizeIndex = (request: Request): Response | undefined => {
+    // A Host identity provider serves signed non-owner sessions without the owner
+    // token exchange; everyone else still passes Connection's browser authentication.
+    const identity = ctx.get('connectionIdentity')
+    if (identity !== undefined && ctx.connection.identityPeer(request) !== undefined) return undefined
     let status = 401
     let headers = new Headers()
     let body: string | undefined
@@ -147,7 +151,16 @@ export function apply(ctx: Context, config: Config): void {
       },
       end(text) { body = text },
     })
-    return admitted ? undefined : new Response(body, { status, headers })
+    if (admitted) return undefined
+    // Without the owner cookie, send the browser to the identity provider's login
+    // page. Token exchanges and foreign-origin refusals keep their own response.
+    if (identity !== undefined && status === 401) {
+      return new Response(null, {
+        status: 303,
+        headers: { location: identity.loginPath, 'cache-control': 'no-store' },
+      })
+    }
+    return new Response(body, { status, headers })
   }
   ctx.effect(() => ctx.webServer.registerFallback({
     resource: (request, peer) => serveStatic(
@@ -157,10 +170,11 @@ export function apply(ctx: Context, config: Config): void {
       // A read with a Peer was admitted by its caller; an HTTP request carries
       // none and passes Connection's browser authentication instead.
       () => peer === undefined ? authorizeIndex(request) : undefined,
-      // The browser authentication admits the owner's shared browser Peer. The
+      // The browser authentication admits the owner's shared browser Peer; a
+      // mounted identity provider admits its own signed session instead. The
       // base goes in after all index transforms, so it precedes every resource
       // reference they insert.
-      html => ctx.webServer.renderIndex(html, peer ?? ctx.connection.browserPeer)
+      html => ctx.webServer.renderIndex(html, peer ?? ctx.connection.identityPeer(request) ?? ctx.connection.browserPeer)
         .replace(/<head(?:\s[^>]*)?>/i, open => `${open}<base href="./">`),
     ),
   }), 'frontend-static: fallback seat')

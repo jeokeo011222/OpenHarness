@@ -1,0 +1,58 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/identity/account-directory/README.md
+/:
+  en: 4cf17c6147e7a27b
+  zh: af3efc1359108bac
+/deepseek-ai-dsh-account-directory:
+  en: 60df0aef0f99c730
+  zh: b7779e55e5e71d6b
+/deepseek-ai-dsh-account-directory/summary:
+  en: 51eff466f1d1a7ea
+  zh: 9e574f6c13f3108a
+/deepseek-ai-dsh-account-directory/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: ce40cab8e7534137
+/deepseek-ai-dsh-account-directory/use-this-package:
+  en: 163ee48a90286e41
+  zh: 8e146438abbb8af8
+/deepseek-ai-dsh-account-directory/use-this-package/signing-in:
+  en: 4c8fac719014e717
+  zh: a43dbebe3e292d62
+/deepseek-ai-dsh-account-directory/use-this-package/administering-accounts-and-grants:
+  en: 8d2538f34a5b476b
+  zh: f1e2c1eb442cce8f
+/deepseek-ai-dsh-account-directory/use-this-package/contributing-a-resource-kind:
+  en: fd44ab6c709bfb14
+  zh: d25a2838573ab675
+/deepseek-ai-dsh-account-directory/understand-the-implementation:
+  en: 2804efa1014187b2
+  zh: 6bdd648d3d87199f
+/deepseek-ai-dsh-account-directory/understand-the-implementation/source-map:
+  en: 9310e9fc18ae812a
+  zh: c811050fd7364392
+/deepseek-ai-dsh-account-directory/understand-the-implementation/design-decisions:
+  en: c9ac8ccef6019b04
+  zh: 919baff568f683d2
+/deepseek-ai-dsh-account-directory/further-exploration:
+  en: 702490f4c13c92ea
+  zh: edd19a2730dcd8b8
+/deepseek-ai-dsh-account-directory/model-experience:
+  en: cd8de40fed2ffefe
+  zh: 21114567a74a41c1
+/deepseek-ai-dsh-account-directory/model-experience/kv-cache-effect:
+  en: e2681246395666f6
+  zh: 7f6d1109b3f02062
+/deepseek-ai-dsh-account-directory/known-limitations-and-deferred-work:
+  en: 57f6ae6e0b8cb57e
+  zh: b09ca84dd328c783
+/deepseek-ai-dsh-account-directory/known-limitations-and-deferred-work/dev-note:
+  en: 693e3c93ed14724c
+  zh: 7f78d9d475322a9f
+/deepseek-ai-dsh-account-directory/known-limitations-and-deferred-work/dev-note/open-external-identity-providers:
+  en: 2204fafd2f932154
+  zh: 89da1776fd1a77ff
+/deepseek-ai-dsh-account-directory/known-limitations-and-deferred-work/dev-note/open-spa-sign-in-surfaces:
+  en: 9ba2bb7085d7afdd
+  zh: a962e1d16cf58e20

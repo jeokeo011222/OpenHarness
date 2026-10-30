@@ -29,6 +29,15 @@
     path: ':memory:'
     openAt: never
 
+# Enterprise accounts keep their records in SQLite so the development database
+# can move to a server without changing the account domain consumers. The
+# domain route names the `account` domain declared by dsh-account-directory.
+- id: storage-domain
+  config:
+    backend: json
+    routes:
+      account: sqlite
+
 # ── web-only host rows, the transport layer, and the browser roster ─────────
 
 # `dsh.client` rows are the browser roster the modules node half scans into
@@ -374,7 +383,18 @@
     - id: ontology-panel
       name: '@deepseek-ai/dsh-ontology-injector'
       config:
-        defaultDomain: contract
+        defaultDomains: [contract]
+
+    # Enterprise accounts: SQLite-backed account records, signed browser
+    # sessions at `/login`, the administrator page at `/admin`, and the
+    # domain-scoped role grants the ontology workbench reads.
+    - id: storage-sqlite
+      name: '@deepseek-ai/dsh-storage-sqlite'
+      config:
+        path: !!js dshHomePath('account.sqlite')
+
+    - id: account-directory
+      name: '@deepseek-ai/dsh-account-directory'
 
     # Input triggers: the '/' | '@' pipeline (ui-input-trigger), the command surface over
     # it (ui-commands), and the reference sources (ui-skill / ui-reference).

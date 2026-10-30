@@ -103,6 +103,22 @@ export interface ConnectionTrustRequest {
 /** HTTP status returned before dispatch, or undefined when the request may proceed. */
 export type ConnectionRequestRejection = 401 | 403 | undefined
 
+/**
+ * Host-contributed identity for browser sessions that are not the process
+ * owner, such as signed-in enterprise accounts. Connection applies it before
+ * its owner cookie, so one browser can act as its signed-in account.
+ */
+export interface ConnectionIdentity {
+  /** Login page served when an index request carries no accepted identity. */
+  readonly loginPath: string
+  /**
+   * Resolve the Peer speaking for one HTTP request.
+   * @param request - request headers carrying the identity's own credential.
+   * @returns the admitted Peer, or `undefined` when this request carries no such identity.
+   */
+  peerFor(request: ConnectionTrustRequest): PeerScope | undefined
+}
+
 /** Root/index request facts used by the browser-token exchange. */
 export interface ConnectionIndexRequest extends ConnectionTrustRequest {
   readonly method?: string | undefined
@@ -238,6 +254,13 @@ export interface HostConnectionHandle {
    * @returns the credential's Peer, or the rejection status.
    */
   admit(request: ConnectionTrustRequest): PeerAdmission
+
+  /**
+   * Resolve the Peer a Host identity provider claims for one browser request.
+   * @param request - request headers carrying the identity's credential.
+   * @returns the claimed Peer, or `undefined` when no provider is mounted or this request carries none.
+   */
+  identityPeer(request: ConnectionTrustRequest): PeerScope | undefined
 
   /**
    * Create an independent in-process Peer, disposed with the Context that read `ctx.connection`.
