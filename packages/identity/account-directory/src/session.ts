@@ -138,7 +138,7 @@ export function decodeSessionToken(
   const expiresAt = Number(expiresText)
   if (!Number.isSafeInteger(expiresAt) || expiresAt <= now) return undefined
   const decodedId = decodeBase64Url(userIdText)
-  if (decodedId === undefined || decodedId.byteLength === 0) return undefined
+  if (decodedId === undefined) return undefined
   return { userId: decodedId.toString('utf8') as UserId, authority, expiresAt }
 }
 

@@ -48,11 +48,15 @@ describe('administration page', () => {
       roles: ['reviewer'],
       updatedAt: '2026-01-01T00:00:00.000Z',
     }
-    const html = adminPage(admin, [admin], [grant], '未授权')
+    const viewer = { ...admin, id: brandString<UserId>('account-3'), username: 'bob', roles: [] }
+    const html = adminPage(admin, [admin, viewer], [grant], '未授权')
     expect(html).toContain('alice')
+    expect(html).toContain('bob')
     expect(html).toContain('ontology-domain')
     expect(html).toContain('未授权')
     expect(html).toContain('name="roles" value="publisher"')
+    expect(html).toContain('value="1" checked')
+    expect(html).toContain('value="1">')
   })
 
   it('renders the empty grant list and escapes stored text', () => {

@@ -75,7 +75,7 @@ export const Config: z<Config> = z.object({
   sessionDays: z.natural().min(1).default(30),
   allowRegistration: z.boolean().default(true),
   minPasswordLength: z.natural().min(6).default(8),
-  devHint: z.object({ username: z.string().min(1), password: z.string().min(1) }),
+  devHint: z.object({ username: z.string().min(1), password: z.string().min(1) }).default(undefined as never),
 })
 
 const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{1,63}$/u
@@ -431,6 +431,7 @@ export class AccountDirectory extends Service {
 
   private policy(): RemoteAccessPolicy<{ readonly kind: 'user'; readonly userId: UserId }> {
     return {
+      unrestricted: principal => this.users.get(principal.userId)?.roles.includes('admin') === true,
       bindings: principal => this.bindingsFor(principal.userId),
       explain: request => this.users.has(request.principal.userId)
         ? `${request.action} is not granted to this account`
@@ -443,9 +444,10 @@ export class AccountDirectory extends Service {
     if (account === undefined) return []
     const bindings: RemoteAccessBinding[] = []
     for (const baseline of this.baselines) bindings.push(...baseline(userId))
-    for (const key of this.grantsByUser.get(userId) ?? []) {
-      const grant = this.grants.get(key)
-      if (grant === undefined) continue
+    const keys = this.grantsByUser.get(userId) ?? []
+    const grants = Array.from(keys, key => this.grants.get(key))
+      .filter((grant): grant is StoredGrant => grant !== undefined)
+    for (const grant of grants) {
       const rule = this.rules.get(grant.resourceKind)
       if (rule !== undefined) bindings.push(...rule.bind(grant.resourceId, grant.roles))
     }
@@ -615,6 +617,7 @@ export class AccountDirectory extends Service {
     const routes = [
       this.ctx.webServer.register({ kind: 'exact', path: LOGIN_PATH, handler: (req, res) => { this.serveLogin(req, res) } }),
       this.ctx.webServer.register({ kind: 'exact', path: '/admin', handler: (req, res) => { this.serveAdmin(req, res) } }),
+      this.ctx.webServer.register({ kind: 'exact', path: '/admin/state', handler: (req, res) => { this.handleAdminState(req, res) } }),
       this.ctx.webServer.register({ kind: 'exact', path: '/auth/login', handler: (req, res) => { this.handleLogin(req, res) } }),
       this.ctx.webServer.register({ kind: 'exact', path: '/auth/register', handler: (req, res) => { this.handleRegister(req, res) } }),
       this.ctx.webServer.register({ kind: 'exact', path: '/auth/logout', handler: (req, res) => { this.handleLogout(req, res) } }),
@@ -690,6 +693,15 @@ export class AccountDirectory extends Service {
     })
   }
 
+  /** JSON state for the client workbench: the caller's account plus every account and grant. */
+  private handleAdminState(req: IncomingMessage, res: ServerResponse): void {
+    if (!this.isReadSafe(req)) { res.writeHead(405); res.end(); return }
+    const account = this.sessionAccount(req)
+    if (account === undefined) { sendJson(res, 401, { error: 'sign-in required' }); return }
+    if (!account.roles.includes('admin')) { sendJson(res, 403, { error: '该接口仅管理员可用' }); return }
+    sendJson(res, 200, { account, accounts: this.listAccounts(), grants: this.listGrants() })
+  }
+
   private handleUserCreate(req: IncomingMessage, res: ServerResponse): void {
     void this.submitAdmin(req, res, async () => {
       const form = await readForm(req)
@@ -701,7 +713,6 @@ export class AccountDirectory extends Service {
         ...(displayName === null || displayName.trim() === '' ? {} : { displayName }),
       })
       redirect(res, '/admin')
-      return undefined
     })
   }
 
@@ -716,7 +727,6 @@ export class AccountDirectory extends Service {
         ...(password === null || password === '' ? {} : { password }),
       })
       redirect(res, '/admin')
-      return undefined
     })
   }
 
@@ -725,7 +735,6 @@ export class AccountDirectory extends Service {
       const form = await readForm(req)
       await this.deleteAccount(brandString<UserId>(form.get('userId') ?? ''))
       redirect(res, '/admin')
-      return undefined
     })
   }
 
@@ -739,7 +748,6 @@ export class AccountDirectory extends Service {
         roles: form.getAll('roles'),
       })
       redirect(res, '/admin')
-      return undefined
     })
   }
 
@@ -752,7 +760,6 @@ export class AccountDirectory extends Service {
         resourceId: form.get('resourceId') ?? '',
       })
       redirect(res, '/admin')
-      return undefined
     })
   }
 
@@ -774,7 +781,7 @@ export class AccountDirectory extends Service {
   private async submitAdmin(
     req: IncomingMessage,
     res: ServerResponse,
-    action: (account: AccountSummary) => Promise<string | undefined>,
+    action: (account: AccountSummary) => Promise<void>,
   ): Promise<void> {
     if (req.method !== 'POST') { res.writeHead(405); res.end(); return }
     if (crossesOrigin(req, this.secure)) { sendHtml(res, 403, loginPage('跨站请求被拒绝', false)); return }
@@ -782,8 +789,7 @@ export class AccountDirectory extends Service {
     if (account === undefined) { redirect(res, LOGIN_PATH); return }
     if (!account.roles.includes('admin')) { sendHtml(res, 403, loginPage('该账号不是管理员', false)); return }
     try {
-      const page = await action(account)
-      if (page !== undefined) sendHtml(res, 400, page)
+      await action(account)
     } catch (error) {
       const message = error instanceof Error ? error.message : '账号操作失败'
       sendHtml(res, 400, adminPage(account, this.listAccounts(), this.listGrants(), message))

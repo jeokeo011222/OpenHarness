@@ -6,7 +6,11 @@
  * dist root is 403, unknown extensions ship as octet-stream, and non-GET/HEAD
  * is 405. An HTTP index request first passes Connection's browser
  * authentication and renders for the browser Peer; an in-process read renders
- * for the Peer its caller admitted. Both renders go through the webserver's
+ * for the Peer its caller admitted. When an identity provider is mounted, a
+ * browser index request renders only for its signed session and every other
+ * request is sent to the provider's login page; without one, the index passes
+ * Connection's browser authentication and renders for the browser Peer. Both
+ * renders go through the webserver's
  * index render (structured injection rows, then raw taps). Non-index assets
  * stay public; every file other than the index carries a weak ETag with
  * `cache-control: no-cache` and answers a matching `If-None-Match` with 304,
@@ -133,14 +137,20 @@ async function serveStatic(
 export function apply(ctx: Context, config: Config): void {
   const distIndex = config.distIndex
   const distRoot = dirname(distIndex)
-  // Connection's browser authentication writes the token exchange's 303 or
-  // the 401 through a writeHead/end response; capture it as a Fetch response.
-  // The answer stays a 401 unless Connection writes another one.
+  // A mounted identity provider owns the browser gate: a signed local session
+  // renders the index, and every other index request goes to the login page —
+  // the local account is the only way in. Connection's browser authentication
+  // still answers when no identity provider is mounted (desktop or plain
+  // static serving); its writeHead/end response is captured as a Fetch response.
   const authorizeIndex = (request: Request): Response | undefined => {
-    // A Host identity provider serves signed non-owner sessions without the owner
-    // token exchange; everyone else still passes Connection's browser authentication.
     const identity = ctx.get('connectionIdentity')
-    if (identity !== undefined && ctx.connection.identityPeer(request) !== undefined) return undefined
+    if (identity !== undefined) {
+      if (ctx.connection.identityPeer(request) !== undefined) return undefined
+      return new Response(null, {
+        status: 303,
+        headers: { location: identity.loginPath, 'cache-control': 'no-store' },
+      })
+    }
     let status = 401
     let headers = new Headers()
     let body: string | undefined
@@ -152,14 +162,6 @@ export function apply(ctx: Context, config: Config): void {
       end(text) { body = text },
     })
     if (admitted) return undefined
-    // Without the owner cookie, send the browser to the identity provider's login
-    // page. Token exchanges and foreign-origin refusals keep their own response.
-    if (identity !== undefined && status === 401) {
-      return new Response(null, {
-        status: 303,
-        headers: { location: identity.loginPath, 'cache-control': 'no-store' },
-      })
-    }
     return new Response(body, { status, headers })
   }
   ctx.effect(() => ctx.webServer.registerFallback({

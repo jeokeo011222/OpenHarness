@@ -3,9 +3,8 @@ import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Locator, Page } from 'playwright'
 import { chromium } from 'playwright'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, onTestFailed, vi } from 'vitest'
-import type { AccountView } from '@deepseek-ai/dsh-deepseek-account/types'
-import type {} from '@deepseek-ai/dsh-deepseek-account'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, onTestFailed } from 'vitest'
+
 import type {} from '@deepseek-ai/dsh-api-session-controller'
 import {
   compareOrRefreshGolden, launchWebScaffold, seedSession, watchConsole,
@@ -417,26 +416,14 @@ describe('web e2e: sidebar search alignment and row action targets', () => {
 
   it.each([false, true])('keeps account footer geometry in wide and rail layouts (signed in: %s)', async (signedIn) => {
     onTestFailed(() => saveFailureShot(page, `web-e2e-sidebar-account-${String(signedIn)}`))
-    const account = scaffold.ctx.deepseekAccount
-    const state: AccountView = {
-      status: 'credential-stored', attempt: null,
-      links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' },
+    // The launcher reads the local session probe; the stub answers it without a real login.
+    if (signedIn) {
+      await page.route('**/auth/state', route => route.fulfill({ json: {
+        signedIn: true, account: { username: 'sidebar', displayName: 'Sidebar account', roles: [] },
+      } }))
+      await page.reload({ waitUntil: 'load' })
     }
-    // Only Platform identity is synthetic; the account provider's RPC and client renderer remain composed.
-    const mocks = signedIn ? [
-      vi.spyOn(account, 'getState').mockResolvedValue(state),
-      vi.spyOn(account, 'getProfile').mockResolvedValue({
-        status: 'ready', value: { id: null, name: 'Sidebar account', contact: null, avatarUrl: null },
-      }),
-      vi.spyOn(account, 'getBalance').mockResolvedValue({ status: 'ready', value: [], bonusWallets: [] }),
-      vi.spyOn(account, 'watch').mockImplementation(async function* (signal) {
-        yield state
-        if (signal.aborted) return
-        await new Promise<void>((resolve) => { signal.addEventListener('abort', () => { resolve() }, { once: true }) })
-      }),
-    ] : []
     try {
-      if (signedIn) await page.reload({ waitUntil: 'load' })
       const accountButton = page.getByRole('button', { name: 'Account menu', exact: true })
       await expect.poll(() => accountButton.getAttribute('data-signed-out')).toBe(String(!signedIn))
       const measure = () => accountButton.evaluate((element) => {
@@ -479,7 +466,6 @@ describe('web e2e: sidebar search alignment and row action targets', () => {
       expect(tripwire.pageErrors).toEqual([])
     } finally {
       await page.close()
-      mocks.forEach((mock) => { mock.mockRestore() })
     }
   })
 

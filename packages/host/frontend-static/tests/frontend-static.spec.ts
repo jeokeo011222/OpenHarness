@@ -230,6 +230,46 @@ describe('real Loader composition', () => {
     expect(() => server.registerFallback(() => {})).not.toThrow()
   })
 
+  it('gates the browser index on a mounted identity provider, rendering only signed sessions', async () => {
+    const scope = await mkdtemp(join(tmpdir(), 'dsh-frontend-static-'))
+    try {
+      const dist = join(scope, 'dist')
+      await mkdir(dist)
+      const distIndex = join(dist, 'index.html')
+      await writeFile(distIndex, '<head></head><body>shell</body>')
+      const ctx = new Context()
+      const seats: Array<(request: Request, peer?: Connection.PeerScope) => Promise<Response>> = []
+      ctx.provide('webServer', {
+        registerFallback: (seat: { readonly resource: (request: Request, peer?: Connection.PeerScope) => Promise<Response> }) => {
+          seats.push(seat.resource)
+        },
+        renderIndex: (html: string) => html,
+      } as unknown as Context['webServer'])
+      const sessionPeer = { principal: { kind: 'user' } } as Connection.PeerScope
+      ctx.provide('connection', {
+        identityPeer: (request: Request) => request.headers.get('cookie') === 'session=1' ? sessionPeer : undefined,
+        authorizeIndex: () => { throw new Error('browser authentication must not run when an identity provider is mounted') },
+        browserPeer: sessionPeer,
+      } as unknown as Context['connection'])
+      ctx.provide('connectionIdentity', { loginPath: '/login', peerFor: () => sessionPeer })
+      FrontendStatic.apply(ctx, { distIndex })
+      const resource = seats[0]
+      if (resource === undefined) throw new Error('frontend-static did not claim the fallback seat')
+      // Without a signed session the browser is sent to the login page, whatever
+      // Connection's owner-cookie answer would have been.
+      const anonymous = await resource(new Request('http://browser.invalid/'))
+      expect(anonymous.status).toBe(303)
+      expect(anonymous.headers.get('location')).toBe('/login')
+      expect(anonymous.headers.get('cache-control')).toBe('no-store')
+      const signed = await resource(new Request('http://browser.invalid/', { headers: { cookie: 'session=1' } }))
+      expect(signed.status).toBe(200)
+      expect(await signed.text()).toContain('<base href="./">')
+      await ctx.fiber.dispose()
+    } finally {
+      await rm(scope, { recursive: true, force: true })
+    }
+  })
+
   it('answers in-process reads for the given Peer without browser authentication', { timeout: 60_000 }, async () => {
     const loaded = await loadComposition()
     const server = loaded.webServer

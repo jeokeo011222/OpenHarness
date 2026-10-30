@@ -88,6 +88,14 @@ export interface RemoteAccessRequest<P extends Principal> {
  */
 export interface RemoteAccessPolicy<P extends Principal> {
   /**
+   * Answer whether the principal's access is unrestricted, the way the owner's
+   * is: every action on every resource, and the owner access snapshot. Read
+   * before `bindings()`; a throw fails closed to the binding evaluation.
+   * @param principal - non-owner caller of this policy's kind.
+   * @returns true when the principal needs no binding to act.
+   */
+  unrestricted?(principal: P): boolean
+  /**
    * List the principal's bindings. Called once per `decide()`, once per
    * `allows()`, and once per snapshot computation; never cached.
    * @param principal - non-owner caller of this policy's kind.

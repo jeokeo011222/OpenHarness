@@ -182,7 +182,8 @@ export class RemoteAccessService extends TypertRemoteService {
 
   /**
    * Gateway-only: decide one request whose resources the Gateway resolved.
-   * The owner is allowed, and so is `remoteAccess/follow`: every Peer reads
+   * The owner is allowed, so is a principal the policy answers `unrestricted()`
+   * for, and so is `remoteAccess/follow`: every Peer reads
    * its own snapshot. Otherwise the action is allowed only when, on every
    * listed resource, some binding of the principal's policy names that
    * resource, has a role listing the action, and has no condition or a
@@ -202,6 +203,7 @@ export class RemoteAccessService extends TypertRemoteService {
     if (principal.kind === 'owner' || action === FOLLOW_ACTION) return ALLOW
     const entry = this.policies.get(principal.kind)
     if (entry === undefined) return NO_ALLOW
+    if (this.unrestrictedFor(principal)) return ALLOW
     const bindings = this.bindingsOf(entry, principal, action)
     if (bindings === undefined) return POLICY_FAILED
     for (const resource of request.resources) {
@@ -239,6 +241,7 @@ export class RemoteAccessService extends TypertRemoteService {
     const action: RemoteAccessAction = `${invocation.request.namespace}/${invocation.request.method}`
     const entry = this.policies.get(principal.kind)
     if (entry === undefined) return false
+    if (this.unrestrictedFor(principal)) return true
     const bindings = this.bindingsOf(entry, principal, action)
     return bindings !== undefined && this.evaluate(entry, bindings, action, resource, undefined).kind === 'allow'
   }
@@ -253,6 +256,7 @@ export class RemoteAccessService extends TypertRemoteService {
   snapshotFor(principal: Principal): RemoteAccessBaseline {
     // oxlint-disable-next-line typescript/no-unnecessary-condition -- other packages merge non-owner kinds into PrincipalMap.
     if (principal.kind === 'owner') return OWNER_BASELINE
+    if (this.unrestrictedFor(principal)) return OWNER_BASELINE
     return { type: 'baseline', owner: false, grants: this.grantsFor(principal) }
   }
 
@@ -279,9 +283,20 @@ export class RemoteAccessService extends TypertRemoteService {
     const follower = new AccessFollower(principal)
     this.followers.add(follower)
     try {
+      // An unrestricted principal reads the owner baseline, like the owner. The
+      // generation ends when the answer narrows, so the reader reopens onto a
+      // fresh baseline instead of receiving diffs an owner baseline cannot carry.
+      if (this.unrestrictedFor(principal)) {
+        yield OWNER_BASELINE
+        while (await follower.changed(generation)) {
+          if (!this.unrestrictedFor(principal)) return
+        }
+        return
+      }
       let sent = this.grantsFor(principal)
       yield { type: 'baseline', owner: false, grants: sent }
       while (await follower.changed(generation)) {
+        if (this.unrestrictedFor(principal)) return
         const next = this.grantsFor(principal)
         const previous = sent
         sent = next
@@ -295,6 +310,19 @@ export class RemoteAccessService extends TypertRemoteService {
       }
     } finally {
       this.followers.delete(follower)
+    }
+  }
+
+  /** One `unrestricted()` answer; false without a policy, or after a logged failure. */
+  private unrestrictedFor(principal: Principal): boolean {
+    const entry = this.policies.get(principal.kind)
+    if (entry === undefined) return false
+    try {
+      return entry.policy.unrestricted?.(principal) ?? false
+    } catch (error) {
+      // A failure reads as not unrestricted, so the binding evaluation decides.
+      this.report(entry, 'evaluate unrestricted access', error)
+      return false
     }
   }
 

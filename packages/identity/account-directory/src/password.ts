@@ -17,6 +17,7 @@ const MAX_MEMORY = 64 * 1024 * 1024
 function derive(password: string, salt: Buffer, keyLength: number, options: ScryptOptions): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     scrypt(password, salt, keyLength, options, (error, derived) => {
+      /* v8 ignore next -- scrypt rejects invalid parameters synchronously, so the callback error path has no reachable trigger */
       if (error !== null) reject(error)
       else resolve(derived)
     })
@@ -41,20 +42,21 @@ export async function hashPassword(password: string): Promise<string> {
  * @returns whether the password matches; malformed verifiers never match.
  */
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  const parts = stored.split('$')
-  if (parts.length !== 6 || parts[0] !== SCHEME) return false
-  const cost = Number(parts[1])
-  const blockSize = Number(parts[2])
-  const parallelization = Number(parts[3])
-  const salt = Buffer.from(parts[4] ?? '', 'base64url')
-  const expected = Buffer.from(parts[5] ?? '', 'base64url')
+  const [scheme, costText, blockSizeText, parallelizationText, saltText, expectedText, extra] = stored.split('$')
+  if (scheme !== SCHEME || extra !== undefined || saltText === undefined || expectedText === undefined) return false
+  const cost = Number(costText)
+  const blockSize = Number(blockSizeText)
+  const parallelization = Number(parallelizationText)
   if (!Number.isSafeInteger(cost) || !Number.isSafeInteger(blockSize) || !Number.isSafeInteger(parallelization)) return false
+  const salt = Buffer.from(saltText, 'base64url')
+  const expected = Buffer.from(expectedText, 'base64url')
   if (salt.byteLength === 0 || expected.byteLength === 0) return false
+  // scrypt derives exactly `expected.byteLength` bytes, so the buffers always compare equal in length.
   const actual = await derive(password, salt, expected.byteLength, {
     N: cost,
     r: blockSize,
     p: parallelization,
     maxmem: MAX_MEMORY,
   })
-  return actual.byteLength === expected.byteLength && timingSafeEqual(actual, expected)
+  return timingSafeEqual(actual, expected)
 }

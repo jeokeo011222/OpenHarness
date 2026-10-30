@@ -138,6 +138,7 @@ function invocationOf(ctx: Context, principal: Principal, method = 'follow', nam
 async function follow(ctx: Context, principal: Principal): Promise<{
   readonly frames: RemoteAccessFrame[]
   readonly next: () => Promise<RemoteAccessFrame>
+  readonly ended: () => Promise<boolean>
   readonly stop: () => Promise<void>
 }> {
   const abort = new AbortController()
@@ -153,6 +154,11 @@ async function follow(ctx: Context, principal: Principal): Promise<{
       const frame = result.value as RemoteAccessFrame
       frames.push(frame)
       return frame
+    },
+    ended: async () => {
+      const result = await iterator.next()
+      if (result.done === false) frames.push(result.value as RemoteAccessFrame)
+      return result.done === true
     },
     stop: async () => {
       abort.abort()
@@ -615,5 +621,84 @@ describe('remoteAccess/follow', () => {
     await expect(pending).resolves.toEqual({ done: true, value: undefined })
     // A cancelled generation no longer receives invalidations.
     access.invalidate()
+  })
+})
+
+describe('unrestricted policies', () => {
+  it('allows an unrestricted principal every action on every resource and shows the owner baseline', async () => {
+    const { ctx, access } = await setup()
+    access.registerPolicy('test-guest', { unrestricted: () => true, bindings: () => [] })
+    await expect(call(ctx, GUEST, 'read')).resolves.toBe('read')
+    await expect(call(ctx, GUEST, 'hidden')).resolves.toBe('hidden')
+    await expect(call(ctx, GUEST, 'write', { request: { shelfId: 'r2', text: 'hi' } })).resolves.toBe('hi')
+    await expect(call(ctx, GUEST, 'rooms')).resolves.toEqual(['r1', 'r2'])
+    expect(access.snapshotFor(GUEST)).toEqual({ type: 'baseline', owner: true })
+  })
+
+  it('fails closed to the binding evaluation when unrestricted() throws, logging the policy once per change', async () => {
+    const { ctx, access } = await setup()
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    let mode: 'answer' | 'throw' = 'answer'
+    access.registerPolicy('test-guest', {
+      unrestricted: () => {
+        if (mode === 'throw') throw new Error('role store unavailable')
+        return true
+      },
+      bindings: () => [],
+    })
+    expect(access.snapshotFor(GUEST)).toEqual({ type: 'baseline', owner: true })
+    mode = 'throw'
+    expect(access.snapshotFor(GUEST)).toEqual({ type: 'baseline', owner: false, grants: [] })
+    await expect(call(ctx, GUEST, 'read')).rejects.toMatchObject({ details: { reason: 'no-allow' } })
+    expect(warn).toHaveBeenCalledWith(
+      'remote access: the "test-guest" policy failed to evaluate unrestricted access; its further failures are not logged until access state changes')
+  })
+
+  it('sends an unrestricted principal the owner baseline and ends the generation when the answer narrows', async () => {
+    const { ctx, access } = await setup()
+    let admin = true
+    access.registerPolicy('test-guest', { unrestricted: () => admin, bindings: () => [] })
+    const guest = await follow(ctx, GUEST)
+    await expect(guest.next()).resolves.toEqual({ type: 'baseline', owner: true })
+    admin = false
+    access.invalidate(GUEST)
+    await expect(guest.ended()).resolves.toBe(true)
+  })
+
+  it('keeps an unrestricted reader open across an invalidation that changes nothing', async () => {
+    const { ctx, access } = await setup()
+    access.registerPolicy('test-guest', { unrestricted: () => true, bindings: () => [] })
+    const abort = new AbortController()
+    const stream = ctx.extend({ invocation: invocationOf(ctx, GUEST) }).remoteAccess.follow(abort.signal)[Symbol.asyncIterator]()
+    await expect(stream.next()).resolves.toMatchObject({ value: { type: 'baseline', owner: true } })
+    const pending = stream.next()
+    access.invalidate(GUEST)
+    await new Promise<void>((resolve) => { setImmediate(resolve) })
+    abort.abort()
+    await expect(pending).resolves.toEqual({ done: true, value: undefined })
+  })
+
+  it('ends an unrestricted generation that is cancelled while waiting', async () => {
+    const { ctx, access } = await setup()
+    access.registerPolicy('test-guest', { unrestricted: () => true, bindings: () => [] })
+    const abort = new AbortController()
+    const stream = ctx.extend({ invocation: invocationOf(ctx, GUEST) }).remoteAccess.follow(abort.signal)[Symbol.asyncIterator]()
+    await expect(stream.next()).resolves.toMatchObject({ value: { type: 'baseline', owner: true } })
+    const pending = stream.next()
+    abort.abort()
+    await expect(pending).resolves.toEqual({ done: true, value: undefined })
+  })
+
+  it('ends a grant-based generation when the answer widens, so the reader reopens onto the owner baseline', async () => {
+    const { ctx, access } = await setup()
+    let admin = false
+    access.registerPolicy('test-guest', { unrestricted: () => admin, bindings: () => [{ role: READER, resource: GLOBAL }] })
+    const guest = await follow(ctx, GUEST)
+    await expect(guest.next()).resolves.toEqual({
+      type: 'baseline', owner: false, grants: [{ resource: GLOBAL, actions: ['notes/read', 'notes/rooms', 'notes/write'] }],
+    })
+    admin = true
+    access.invalidate(GUEST)
+    await expect(guest.ended()).resolves.toBe(true)
   })
 })

@@ -32,6 +32,15 @@ function formRequest(contentType: string, body: string): IncomingMessage {
   } as IncomingMessage
 }
 
+function chunkedRequest(headers: Record<string, string>, ...chunks: readonly (Buffer | string)[]): IncomingMessage {
+  return {
+    headers,
+    async *[Symbol.asyncIterator](): AsyncGenerator<Buffer | string> {
+      for (const chunk of chunks) yield chunk
+    },
+  } as IncomingMessage
+}
+
 describe('responses', () => {
   it('writes HTML and JSON with no-store caching', () => {
     const html = recordingResponse()
@@ -69,6 +78,13 @@ describe('form submissions', () => {
     await expect(readForm(formRequest('application/json', '{}'))).rejects.toThrow('expected a form submission')
     await expect(readForm(formRequest('application/x-www-form-urlencoded', 'x'.repeat(64 * 1024 + 1))))
       .rejects.toThrow('form body is too large')
+  })
+
+  it('decodes string chunks and refuses a body without a form content type', async () => {
+    const form = await readForm(chunkedRequest({ 'content-type': 'application/x-www-form-urlencoded' }, 'a=1&', 'b=2'))
+    expect(form.get('a')).toBe('1')
+    expect(form.get('b')).toBe('2')
+    await expect(readForm(chunkedRequest({}, 'a=1'))).rejects.toThrow('expected a form submission')
   })
 })
 

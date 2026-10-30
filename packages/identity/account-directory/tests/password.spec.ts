@@ -22,4 +22,21 @@ describe('password verifiers', () => {
     expect(await verifyPassword('secret', 'scrypt$not-a-number$8$1$c2FsdA$aGFzaA')).toBe(false)
     expect(await verifyPassword('secret', 'scrypt$16384$8$1$$')).toBe(false)
   })
+
+  it('rejects malformed verifier field layouts before deriving', async () => {
+    expect(await verifyPassword('secret', 'scrypt$16384$8$1$c2FsdA$aGFzaA$extra')).toBe(false)
+    expect(await verifyPassword('secret', 'scrypt')).toBe(false)
+    expect(await verifyPassword('secret', 'scrypt$16384$8$1')).toBe(false)
+    expect(await verifyPassword('secret', 'scrypt$16384$8$1$c2FsdA')).toBe(false)
+    expect(await verifyPassword('secret', 'scrypt$16384$8$1$c2FsdA$')).toBe(false)
+  })
+
+  it('refuses verifiers with an unusable cost, block size, or parallelization', async () => {
+    expect(await verifyPassword('secret', 'scrypt$16384$not-a-number$1$c2FsdA$aGFzaA')).toBe(false)
+    expect(await verifyPassword('secret', 'scrypt$16384$8$not-a-number$c2FsdA$aGFzaA')).toBe(false)
+  })
+
+  it('fails loud when scrypt refuses the stored parameters', async () => {
+    await expect(verifyPassword('secret', 'scrypt$1$8$1$c2FsdA$aGFzaA')).rejects.toThrow()
+  })
 })

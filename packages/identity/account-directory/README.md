@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-account-directory` keeps local enterprise accounts in a storage domain. An administrator registers accounts, assigns global roles and per-resource role grants, and the Host serves a login page plus an administration page. Signed session cookies bind each browser to one account and one authority, and the package publishes the `user` principal kind plus the Connection identity seam so business packages can authorize that caller. The first account on an empty directory becomes the administrator. Grants are the only input access policy sees, so a package that registers no rule for its resource kind stays owner-only.
+`dsh-account-directory` keeps local enterprise accounts in a storage domain. An administrator registers accounts, assigns global roles and per-resource grants, and the Host serves login and administration pages. Signed session cookies bind each browser to one account and one authority; the `user` principal kind and the Connection identity seam let business packages authorize that caller. The first account on an empty directory becomes the administrator, and an administrator passes every Remote access check. Grants and the administrator role are the only inputs access policy sees, so a resource kind without a registered rule stays owner-only.
 
 ## Table of Contents
 
@@ -41,7 +41,7 @@ A successful `POST /auth/login` or `POST /auth/register` answers `303` to `/` wi
 
 ### Administering accounts and grants
 
-`/admin` refuses non-administrators with `403` and sends signed-out visitors to `/login`. The page's forms call `POST /admin/user/create`, `/admin/user/update`, `/admin/user/delete`, `/admin/grant/set`, and `/admin/grant/delete`; each answers `303` back to `/admin` on success and re-renders the page with the failure message otherwise. A grant names a resource kind, a resource id, and at least one role from `ACCOUNT_ROLES`. Deleting an account also removes every grant it holds and disposes its cached Peer.
+`/admin` refuses non-administrators with `403` and sends signed-out visitors to `/login`. The page's forms call `POST /admin/user/create`, `/admin/user/update`, `/admin/user/delete`, `/admin/grant/set`, and `/admin/grant/delete`; each answers `303` back to `/admin` on success and re-renders the page with the failure message otherwise. `GET /admin/state` serves the same directory state as JSON for the client workbench — `{ account, accounts, grants }` — and answers `401` when signed out, `403` when the caller is not an administrator, and `405` to methods other than GET and HEAD. A grant names a resource kind, a resource id, and at least one role from `ACCOUNT_ROLES`. Deleting an account also removes every grant it holds and disposes its cached Peer.
 
 ### Contributing a resource kind
 
@@ -67,7 +67,7 @@ ctx.inject(['accountDirectory'], (scope) => {
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The directory owns the `account` storage domain, one Remote-access policy for the `user` kind, and the `connectionIdentity` service; the observable behavior is covered in [Use this package](#use-this-package).
+The directory owns the `account` storage domain, one Remote-access policy for the `user` kind, and the `connectionIdentity` service; the observable behavior is covered in [Use this package](#use-this-package). The policy answers `unrestricted()` true for an account holding the `admin` role, so an administrator passes every action check and the page opens with the owner access snapshot; other accounts act only where their grants and the ACL registry allow.
 
 ### Source map
 
@@ -83,7 +83,7 @@ The directory owns the `account` storage domain, one Remote-access policy for th
 
 ### Design decisions
 
-- **Host HTML, not a Remote namespace.** The `account` Remote namespace belongs to DeepSeek account sign-in, so account and grant administration travels over Host-served forms instead of expanding the client Remote surface.
+- **Host HTML, not a Remote namespace.** The `account` Remote namespace belongs to DeepSeek account sign-in, so account and grant administration travels over Host-served forms and JSON routes instead of expanding the client Remote surface.
 - **Serialized mutations.** Every account and grant change runs through one promise chain, so two concurrent registrations cannot both observe an empty directory or mint the same username.
 - **Guardrails at the mutation.** Username shape, password length, duplicate usernames, unknown roles, and the last-administrator rule fail inside the operation itself, so a Host route and an in-process caller meet the same refusal.
 - **One secret per home.** The signing secret lives in the credentials store under `account-directory/session`, minted on first load; a stored record this build cannot read fails the plugin load instead of silently invalidating every session.
@@ -115,7 +115,7 @@ None; authentication and authorization happen before a model request is assemble
 
 ## Known Limitations and Deferred Work
 
-- **Resource authorization covers declared kinds only** — accounts and grants feed any resource kind a package registers, but the shipped bundle contributes a rule only for `ontology-domain`; every other Remote surface remains owner-only, so a signed-in non-owner account meets refusals in the client UI outside the ontology workbench.
+- **Resource authorization covers declared kinds only** — grants and the administrator role feed the policy for any resource kind a package registers, but the shipped bundle contributes a rule only for `ontology-domain`; every other Remote surface remains owner-only for non-administrators, so a signed-in non-administrator account meets refusals in the client UI outside the ontology workbench.
 - **Cookie authority is per `Host` header** — a deployment served under two different authorities needs a separate sign-in per authority.
 - **No password reset by the account itself** — only an administrator can replace a password; there is no recovery flow.
 - **No account audit trail** — mutations record `updatedAt` on the row but no history of who changed what.
@@ -135,6 +135,6 @@ The `connectionIdentity` seam admits exactly one session format today. An extern
 
 #### Open: SPA sign-in surfaces
 
-The `/auth/state` and `/login` pages are Host-rendered. Presenting account management inside the Web client would require a client Remote surface distinct from the DeepSeek `account` namespace.
+The `/auth/state` and `/login` pages are Host-rendered; the client administration workbench instead reads the `/admin/state` JSON route. Moving sign-in itself into the Web client would still require a surface distinct from the DeepSeek `account` namespace.
 
 </details>

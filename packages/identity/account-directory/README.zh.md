@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-account-directory` 把本地企业账号保存在一个存储域中。管理员注册账号、分配全局角色与按资源的角色授权，Host 提供登录页与管理页。签名会话 cookie 把每个浏览器绑定到一个账号与一个 authority，本包还发布 `user` principal 类型与 Connection 身份接缝，使业务包能够授权该调用方。空目录上的第一个账号成为管理员。授权是访问策略唯一看到的输入，因此没有为自己的资源类型注册规则的包仍保持 owner-only。
+`dsh-account-directory` 把本地企业账号保存在一个存储域中。管理员注册账号、分配全局角色与按资源授权，Host 提供登录页与管理页。签名会话 cookie 把每个浏览器绑定到一个账号与一个 authority；`user` principal 类型与 Connection 身份接缝让业务包能够授权该调用方。空目录上的第一个账号成为管理员，管理员通过每一个 Remote 访问检查。授权与管理员角色是访问策略仅有的输入，因此没有注册规则的资源类型仍保持 owner-only。
 
 ## 目录
 
@@ -41,7 +41,7 @@ kind: "package-reference"
 
 ### 管理账号与授权
 
-`/admin` 对非管理员返回 `403`，对未登录访问者跳转到 `/login`。页面表单调用 `POST /admin/user/create`、`/admin/user/update`、`/admin/user/delete`、`/admin/grant/set`、`/admin/grant/delete`；成功时返回 `303` 回到 `/admin`，失败时带错误信息重新渲染页面。一条授权由资源类型、资源 id 与至少一个 `ACCOUNT_ROLES` 中的角色组成。删除账号会同时移除它持有的全部授权，并释放其缓存的 Peer。
+`/admin` 对非管理员返回 `403`，对未登录访问者跳转到 `/login`。页面表单调用 `POST /admin/user/create`、`/admin/user/update`、`/admin/user/delete`、`/admin/grant/set`、`/admin/grant/delete`；成功时返回 `303` 回到 `/admin`，失败时带错误信息重新渲染页面。`GET /admin/state` 为客户端工作台以 JSON 返回同样的目录状态——`{ account, accounts, grants }`——未登录时返回 `401`，调用方不是管理员时返回 `403`，GET 与 HEAD 之外的方法返回 `405`。一条授权由资源类型、资源 id 与至少一个 `ACCOUNT_ROLES` 中的角色组成。删除账号会同时移除它持有的全部授权，并释放其缓存的 Peer。
 
 ### 贡献资源类型
 
@@ -67,7 +67,7 @@ ctx.inject(['accountDirectory'], (scope) => {
 <details>
 <summary>实现细节——点击展开</summary>
 
-目录拥有 `account` 存储域、`user` 类型的一份 Remote 访问策略，以及 `connectionIdentity` 服务；可观察行为见[使用本包](#use-this-package)。
+目录拥有 `account` 存储域、`user` 类型的一份 Remote 访问策略，以及 `connectionIdentity` 服务；可观察行为见[使用本包](#use-this-package)。policy 对持有 `admin` 角色的账号回答 `unrestricted()` 为 true，因此管理员通过所有 action 检查、页面以 owner 访问快照打开；其他账号只能在其授权与 ACL 注册表允许的范围内操作。
 
 ### 源码地图
 
@@ -83,7 +83,7 @@ ctx.inject(['accountDirectory'], (scope) => {
 
 ### 设计决策
 
-- **Host HTML，而非 Remote 命名空间。** `account` Remote 命名空间属于 DeepSeek 账号登录，因此账号与授权管理走 Host 表单，而不扩张客户端 Remote 面。
+- **Host HTML，而非 Remote 命名空间。** `account` Remote 命名空间属于 DeepSeek 账号登录，因此账号与授权管理走 Host 表单与 JSON 路由，而不扩张客户端 Remote 面。
 - **串行化变更。** 所有账号与授权变更经过同一条 promise 链，因此两个并发注册不会同时看到空目录，也不会撞用同一个用户名。
 - **约束落在变更操作内。** 用户名形状、密码长度、重名、未知角色与末位管理员规则都在操作内部失败，因此 Host 路由与进程内调用者面对同样的拒绝。
 - **每个 home 一个密钥。** 签名密钥存放于 credentials 存储的 `account-directory/session`，首次加载时生成；本构建无法读取的存储记录会让插件装载失败，而不是静默作废所有会话。
@@ -117,7 +117,7 @@ ctx.inject(['accountDirectory'], (scope) => {
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **资源授权只覆盖已声明的类型**——账号与授权可供给任何包注册的资源类型，但随发布包分发的 bundle 只为 `ontology-domain` 贡献规则；其他 Remote 面仍为 owner-only，因此已登录的非 owner 账号在客户端 UI 的 ontology 工作台之外会遇到拒绝。
+- **资源授权只覆盖已声明的类型**——授权与管理员角色为 policy 供给任何包注册的资源类型的输入，但随发布包分发的 bundle 只为 `ontology-domain` 贡献规则；其他 Remote 面对非管理员仍为 owner-only，因此已登录的非管理员账号在客户端 UI 的 ontology 工作台之外会遇到拒绝。
 - **Cookie authority 取决于 `Host` 头**——以两个不同 authority 提供服务的部署需要各自登录一次。
 - **账号无法自助重置密码**——只有管理员可以替换密码，没有找回流程。
 - **没有账号审计轨迹**——变更记录只写入行上的 `updatedAt`，没有“谁改了什么”的历史。
@@ -137,6 +137,6 @@ ctx.inject(['accountDirectory'], (scope) => {
 
 #### 待定：SPA 内的登录面
 
-`/auth/state` 与 `/login` 都是 Host 渲染页面。要在 Web 客户端内呈现账号管理，需要一个区别于 DeepSeek `account` 命名空间的客户端 Remote 面。
+`/auth/state` 与 `/login` 都是 Host 渲染页面；客户端管理工作台改为读取 `/admin/state` JSON 路由。要把登录本身搬进 Web 客户端，仍需要一个区别于 DeepSeek `account` 命名空间的界面。
 
 </details>

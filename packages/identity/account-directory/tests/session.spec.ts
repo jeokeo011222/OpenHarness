@@ -46,6 +46,19 @@ describe('session tokens', () => {
     expect(decodeSessionToken('v2.a.b.c', AUTHORITY, SECRET, Date.now())).toBeUndefined()
     expect(decodeSessionToken(`v1.!.${String(Date.now() + 60_000)}.AAAA`, AUTHORITY, SECRET, Date.now())).toBeUndefined()
   })
+
+  it('refuses a token naming an empty account id', () => {
+    const token = encodeSessionToken(brandString<UserId>(''), AUTHORITY, Date.now() + 60_000, SECRET)
+    expect(decodeSessionToken(token, AUTHORITY, SECRET, Date.now())).toBeUndefined()
+  })
+
+  it('refuses a signature segment that is not valid base64url or of the wrong length', () => {
+    const token = minted(Date.now() + 60_000)
+    const prefix = token.split('.').slice(0, 3).join('.')
+    expect(decodeSessionToken(`${prefix}.!`, AUTHORITY, SECRET, Date.now())).toBeUndefined()
+    expect(decodeSessionToken(`${prefix}.AAAAA`, AUTHORITY, SECRET, Date.now())).toBeUndefined()
+    expect(decodeSessionToken(`${prefix}.AA`, AUTHORITY, SECRET, Date.now())).toBeUndefined()
+  })
 })
 
 describe('cookie audience', () => {
@@ -79,6 +92,7 @@ describe('session cookies', () => {
     const name = sessionCookieName(AUTHORITY)
     expect(submittedCookie({ headers: { cookie: `a=1; ${name}=value` } }, name)).toBe('value')
     expect(submittedCookie({ headers: new Headers({ cookie: `${name}=value` }) }, name)).toBe('value')
+    expect(submittedCookie({ headers: new Headers() }, name)).toBeUndefined()
     expect(submittedCookie({ headers: {} }, name)).toBeUndefined()
     expect(submittedCookie({ headers: { cookie: 'a=1' } }, name)).toBeUndefined()
   })
@@ -114,5 +128,26 @@ describe('session secret', () => {
     expect(key).toBeDefined()
     records.set(key as string, { kind: 'grant', payload: { version: 2, secret: 'abc' } })
     await expect(loadSessionSecret(provider)).rejects.toThrow('unsupported version')
+  })
+
+  it('fails loud when the credential store yields no record', async () => {
+    const provider = { async modifyRecord(): Promise<undefined> { return undefined } } as never
+    await expect(loadSessionSecret(provider)).rejects.toThrow('session credential record is missing')
+  })
+
+  it('fails loud on a payload this build cannot read', async () => {
+    for (const payload of ['text', null, []]) {
+      const provider = { async modifyRecord(): Promise<unknown> { return { kind: 'grant', payload } } } as never
+      await expect(loadSessionSecret(provider)).rejects.toThrow('unsupported payload')
+    }
+  })
+
+  it('fails loud on a secret that is not a 32-byte base64url string', async () => {
+    for (const secret of [42, 'abc', 'a'.repeat(42)]) {
+      const provider = { async modifyRecord(): Promise<unknown> {
+        return { kind: 'grant', payload: { version: 1, secret } }
+      } } as never
+      await expect(loadSessionSecret(provider)).rejects.toThrow('invalid secret')
+    }
   })
 })
