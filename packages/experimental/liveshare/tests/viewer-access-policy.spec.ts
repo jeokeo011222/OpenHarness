@@ -40,8 +40,14 @@ const CALL = { request: {} }
  * set, so the two are read together when a role changes.
  */
 const GLOBAL_ACTIONS = [
-  'commands/list', 'llm/listConfigurableProviders', 'llm/listProviders', 'session/canOpenWorkspacePath',
-  'session/control', 'session/list', 'session/modelCatalog', 'workspace/follow',
+  'commands/list', 'llm/listConfigurableProviders', 'llm/listProviders',
+  'ontologyStore/auditLog', 'ontologyStore/diffVersions', 'ontologyStore/drilldownMetric',
+  'ontologyStore/explainMetric', 'ontologyStore/exportDomain', 'ontologyStore/graph',
+  'ontologyStore/health', 'ontologyStore/listDomains', 'ontologyStore/listMetricBatches',
+  'ontologyStore/listMetrics', 'ontologyStore/listVersions', 'ontologyStore/queryDomain',
+  'ontologyStore/runMetric', 'ontologyStore/validateDomain',
+  'session/canOpenWorkspacePath', 'session/control', 'session/list', 'session/modelCatalog',
+  'workspace/follow',
 ] as const
 /** Session reads the served page's startup and render paths need; see {@link GLOBAL_ACTIONS}. */
 const SESSION_READS = [

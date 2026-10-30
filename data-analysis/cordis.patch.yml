@@ -1,0 +1,5 @@
+# Data analysis workbench: one host row that registers the dataset tools and
+# one client row that owns the right-sidebar panel.
+- insert:
+    - id: data-analysis
+      name: dsh-data-analysis

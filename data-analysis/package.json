@@ -1,0 +1,47 @@
+{
+  "name": "dsh-data-analysis",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Data analysis workbench bundle: import CSV/Excel, databases, and REST APIs into datasets, query them with a safe DSL, chart them, and let the agent read the same numbers.",
+  "icon": "./icon.svg",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./icon": "./icon.svg",
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "locale/zh.json",
+    "locale/en.json",
+    "host/plugin.js",
+    "host/prompt.js",
+    "host/workspace.js",
+    "host/csv.js",
+    "host/infer.js",
+    "host/xlsx.js",
+    "host/dataset.js",
+    "host/query.js",
+    "host/expr.js",
+    "host/sql.js",
+    "host/database.js",
+    "host/rest.js",
+    "host/charts.js",
+    "host/tools.js",
+    "host/util.js"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  }
+}

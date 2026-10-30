@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "数据分析",
+    "description": "导入文件、数据库与 REST API，生成数据集，查询、出图，并让 Agent 用同一份数字解读。"
+  }
+}

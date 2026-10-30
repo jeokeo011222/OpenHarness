@@ -42,10 +42,20 @@ export const VIEWER_ENDPOINT_CLASSES = {
   'llm/listProviders': 'reader-global-read', // the page lists providers
   'session/canOpenWorkspacePath': 'reader-global-read', // the page asks whether a path can be opened
   'session/modelCatalog': 'reader-global-read', // the page reads the model catalog
+  'ontologyStore/auditLog': 'reader-global-read', // the page reads the ontology audit trail
   'ontologyStore/diffVersions': 'reader-global-read', // the page compares two stored ontology snapshots
+  'ontologyStore/exportDomain': 'reader-global-read', // the page exports a domain's live graph as Turtle
   'ontologyStore/graph': 'reader-global-read', // the page reads a domain's active graph
+  'ontologyStore/health': 'reader-global-read', // the page reads store path, format version and counters
   'ontologyStore/listDomains': 'reader-global-read', // the page lists registered ontology domains
+  'ontologyStore/listMetricBatches': 'reader-global-read', // the page lists analytics instance batches
+  'ontologyStore/listMetrics': 'reader-global-read', // the page lists the analytics metric catalog
+  'ontologyStore/runMetric': 'reader-global-read', // the page runs one read-only analytics metric
+  'ontologyStore/explainMetric': 'reader-global-read', // the page reads one metric's definition and query
+  'ontologyStore/drilldownMetric': 'reader-global-read', // the page lists contracts behind one metric
   'ontologyStore/listVersions': 'reader-global-read', // the page lists a domain's version snapshots
+  'ontologyStore/queryDomain': 'reader-global-read', // the page runs a read-only SPARQL query
+  'ontologyStore/validateDomain': 'reader-global-read', // the page reads a domain's structural validation
 
   // ── reader-session-read ─────────────────────────────────────────────────────────────
   'commands/list': 'reader-session-read', // the page lists slash commands for a visible Session (also granted globally)
@@ -226,10 +236,18 @@ export const VIEWER_ENDPOINT_CLASSES = {
   'schedule/update': 'owner-only', // owner schedules
   'subagents/interruptByParent': 'owner-only', // owner subagents
   'subagents/prompt': 'owner-only', // owner subagents
-  'ontologyStore/activateVersion': 'owner-only', // owner switches the active ontology snapshot
   'ontologyStore/applyEdits': 'owner-only', // owner edits the shared ontology graph
+  'ontologyStore/applyPatch': 'owner-only', // owner applies graph edits
   'ontologyStore/createDomain': 'owner-only', // owner creates a shared ontology domain
+  'ontologyStore/deleteDomain': 'owner-only', // owner deletes a shared ontology domain and all its versions
+  'ontologyStore/deleteVersion': 'owner-only', // owner deletes one stored ontology snapshot
+  'ontologyStore/evaluateQuality': 'owner-only', // owner scores a drafted ontology
   'ontologyStore/generate': 'owner-only', // owner writes an ontology from an uploaded document
+  'ontologyStore/importOntology': 'owner-only', // owner imports Turtle as a new live ontology version
+  'ontologyStore/importInstances': 'owner-only', // owner imports a Turtle instance batch for analytics
+  'ontologyStore/deleteInstanceBatch': 'owner-only', // owner clears one analytics instance batch
+  'ontologyStore/publishVersion': 'owner-only', // owner publishes a reviewed ontology version
+  'ontologyStore/submitReview': 'owner-only', // owner moves a draft version into review
   'ontologyStore/updateDomain': 'owner-only', // owner renames or disables a shared ontology domain
 
   // Owner share management stays on the owner's own page; a `share-viewer` Peer is refused first.
