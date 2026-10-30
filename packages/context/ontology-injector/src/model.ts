@@ -15,6 +15,7 @@ import type {
   OntologyGraphEdge,
   OntologyGraphNode,
   OntologyNodeKind,
+  OntologyPatch,
   OntologyVersionDiff,
 } from './types.ts'
 
@@ -22,7 +23,7 @@ const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
 const RDFS = 'http://www.w3.org/2000/01/rdf-schema#'
 const OWL = 'http://www.w3.org/2002/07/owl#'
 const XSD = 'http://www.w3.org/2001/XMLSchema#'
-/** Annotation vocabulary for extraction provenance. */
+/** Annotation vocabulary for the source clause and clause text. */
 const META = 'http://example.org/ontology/meta#'
 
 const RDF_TYPE = `${RDF}type`
@@ -36,6 +37,7 @@ const OWL_OBJECT_PROPERTY = `${OWL}ObjectProperty`
 const OWL_DATATYPE_PROPERTY = `${OWL}DatatypeProperty`
 const RDFS_CLASS = `${RDFS}Class`
 const META_SOURCE = `${META}sourceClause`
+const META_SOURCE_TEXT = `${META}sourceText`
 
 const KNOWN_PREFIXES: readonly (readonly [string, string])[] = [
   [RDF, 'rdf'],
@@ -51,7 +53,10 @@ export interface ModelClass {
   label: string
   comment: string
   parents: string[]
+  /** Clause the class was extracted from. */
   source: string
+  /** Clause text the class was extracted from. */
+  sourceText: string
 }
 
 /** One property in the working model. */
@@ -62,7 +67,10 @@ export interface ModelProperty {
   comment: string
   domain: string
   range: string
+  /** Clause the property was extracted from. */
   source: string
+  /** Clause text the property was extracted from. */
+  sourceText: string
 }
 
 /** One domain's working model. */
@@ -175,7 +183,8 @@ export function parseTurtle(turtle: string, domain: string): OntologyModel {
     }
     if (triple.predicate.value === RDFS_LABEL
       || triple.predicate.value === RDFS_COMMENT
-      || triple.predicate.value === META_SOURCE) {
+      || triple.predicate.value === META_SOURCE
+      || triple.predicate.value === META_SOURCE_TEXT) {
       const map = literals.get(subject) ?? new Map<string, string>()
       map.set(triple.predicate.value, triple.object.value)
       literals.set(subject, map)
@@ -215,6 +224,7 @@ export function parseTurtle(turtle: string, domain: string): OntologyModel {
       comment: props?.get(RDFS_COMMENT) ?? '',
       parents: (refs?.get(RDFS_SUBCLASS) ?? []).map(parent => compactIri(parent, namespace)),
       source: props?.get(META_SOURCE) ?? '',
+      sourceText: props?.get(META_SOURCE_TEXT) ?? '',
     })
   }
 
@@ -233,6 +243,7 @@ export function parseTurtle(turtle: string, domain: string): OntologyModel {
       domain: refs?.get(RDFS_DOMAIN)?.map(value => compactIri(value, namespace))[0] ?? '',
       range: refs?.get(RDFS_RANGE)?.map(value => compactIri(value, namespace))[0] ?? '',
       source: props?.get(META_SOURCE) ?? '',
+      sourceText: props?.get(META_SOURCE_TEXT) ?? '',
     })
   }
 
@@ -294,6 +305,7 @@ export function emitTurtle(model: OntologyModel): string {
     if (item.label) statements.push(block('rdfs:label', `"${escapeLiteral(item.label)}"`))
     if (item.comment) statements.push(block('rdfs:comment', `"${escapeLiteral(item.comment)}"`))
     if (item.source) statements.push(block('meta:sourceClause', `"${escapeLiteral(item.source)}"`))
+    if (item.sourceText) statements.push(block('meta:sourceText', `"${escapeLiteral(item.sourceText)}"`))
     for (const parent of item.parents) statements.push(block('rdfs:subClassOf', term(parent, namespace)))
     lines.push(`${term(item.id, namespace)} ${terminate(statements)}`)
     lines.push('')
@@ -305,6 +317,7 @@ export function emitTurtle(model: OntologyModel): string {
     if (item.label) statements.push(block('rdfs:label', `"${escapeLiteral(item.label)}"`))
     if (item.comment) statements.push(block('rdfs:comment', `"${escapeLiteral(item.comment)}"`))
     if (item.source) statements.push(block('meta:sourceClause', `"${escapeLiteral(item.source)}"`))
+    if (item.sourceText) statements.push(block('meta:sourceText', `"${escapeLiteral(item.sourceText)}"`))
     if (item.domain) statements.push(block('rdfs:domain', term(item.domain, namespace)))
     if (item.range) statements.push(block('rdfs:range', term(item.range, namespace)))
     lines.push(`${term(item.id, namespace)} ${terminate(statements)}`)
@@ -336,6 +349,7 @@ export function toGraph(
       label: item.label || item.id,
       comment: item.comment,
       source: item.source,
+      sourceText: item.sourceText,
       domain: '',
       range: '',
       parents: [...item.parents],
@@ -348,6 +362,7 @@ export function toGraph(
       label: item.label || item.id,
       comment: item.comment,
       source: item.source,
+      sourceText: item.sourceText,
       domain: item.domain,
       range: item.range,
       parents: [],
@@ -436,7 +451,7 @@ export function applyEdits(source: OntologyModel, edits: readonly OntologyEdit[]
       case 'add-class': {
         requireIdentifier(edit.id, 'Class')
         if (findClass(edit.id)) throw new OntologyModelError(`Class already exists: ${edit.id}`)
-        model.classes.push({ id: edit.id, label: edit.label, comment: edit.comment, parents: [], source: '' })
+        model.classes.push({ id: edit.id, label: edit.label, comment: edit.comment, parents: [], source: '', sourceText: '' })
         break
       }
       case 'update-class': {
@@ -448,7 +463,7 @@ export function applyEdits(source: OntologyModel, edits: readonly OntologyEdit[]
         for (const parent of edit.parents) {
           if (parent === edit.id) continue
           if (!findClass(parent)) {
-            model.classes.push({ id: parent, label: parent, comment: '', parents: [], source: '' })
+            model.classes.push({ id: parent, label: parent, comment: '', parents: [], source: '', sourceText: '' })
             warnings.push(`Created missing parent class: ${parent}`)
           }
           target.parents.push(parent)
@@ -489,6 +504,7 @@ export function applyEdits(source: OntologyModel, edits: readonly OntologyEdit[]
           domain: edit.domain,
           range: edit.range,
           source: '',
+          sourceText: '',
         })
         break
       }
@@ -600,10 +616,11 @@ function sanitizeName(raw: string, kind: 'class' | 'property'): string {
  *
  * @param model - model mutated in place.
  * @param extraction - classes and properties extracted from one clause.
- * @param clause - clause label recorded as provenance on every new node.
+ * @param clause - clause label stored on every new node.
+ * @param sourceText - clause text stored on every new node.
  * @returns the ids added by this extraction.
  */
-export function mergeExtraction(model: OntologyModel, extraction: Extraction, clause: string): string[] {
+export function mergeExtraction(model: OntologyModel, extraction: Extraction, clause: string, sourceText: string): string[] {
   const added: string[] = []
   const known = new Map(model.classes.map(item => [item.id, item]))
 
@@ -614,6 +631,7 @@ export function mergeExtraction(model: OntologyModel, extraction: Extraction, cl
       if (!existing.label) existing.label = item.label
       if (!existing.comment) existing.comment = item.comment
       if (!existing.source) existing.source = clause
+      if (!existing.sourceText) existing.sourceText = sourceText
       continue
     }
     const created: ModelClass = {
@@ -622,6 +640,7 @@ export function mergeExtraction(model: OntologyModel, extraction: Extraction, cl
       comment: item.comment,
       parents: [],
       source: clause,
+      sourceText,
     }
     model.classes.push(created)
     known.set(id, created)
@@ -631,7 +650,7 @@ export function mergeExtraction(model: OntologyModel, extraction: Extraction, cl
   const ensureClass = (raw: string): string => {
     const id = sanitizeName(raw, 'class')
     if (known.has(id)) return id
-    const created: ModelClass = { id, label: raw, comment: '', parents: [], source: clause }
+    const created: ModelClass = { id, label: raw, comment: '', parents: [], source: clause, sourceText }
     model.classes.push(created)
     known.set(id, created)
     added.push(`class:${id}`)
@@ -651,9 +670,49 @@ export function mergeExtraction(model: OntologyModel, extraction: Extraction, cl
       domain,
       range,
       source: clause,
+      sourceText,
     })
     added.push(`property:${id}`)
   }
 
   return added
+}
+
+/**
+ * Translate a patch into micro-edits against the current model.
+ *
+ * An id present in the model becomes an update, an absent id an addition, so one
+ * patch can both introduce and revise entities. Removals are emitted first.
+ *
+ * @param model - model the patch applies to.
+ * @param patch - classes and properties to add, replace, or remove.
+ * @returns the equivalent micro-edits, in application order.
+ */
+export function patchToEdits(model: OntologyModel, patch: OntologyPatch): OntologyEdit[] {
+  const edited: OntologyEdit[] = []
+  const removedClasses = new Set(patch.removeClasses ?? [])
+  const removedProperties = new Set(patch.removeProperties ?? [])
+  for (const id of patch.removeProperties ?? []) edited.push({ op: 'delete-property', id })
+  for (const id of patch.removeClasses ?? []) edited.push({ op: 'delete-class', id })
+  for (const item of patch.classes ?? []) {
+    const exists = model.classes.some(entry => entry.id === item.id) && !removedClasses.has(item.id)
+    edited.push(exists
+      ? { op: 'update-class', id: item.id, label: item.label, comment: item.comment, parents: [...item.parents] }
+      : { op: 'add-class', id: item.id, label: item.label, comment: item.comment })
+  }
+  for (const item of patch.properties ?? []) {
+    const exists = model.properties.some(entry => entry.id === item.id) && !removedProperties.has(item.id)
+    edited.push(exists
+      ? { op: 'update-property', id: item.id, label: item.label, comment: item.comment, domain: item.domain, range: item.range }
+      : {
+        op: 'add-property',
+        id: item.id,
+        kind: item.kind,
+        label: item.label,
+        comment: item.comment,
+        domain: item.domain,
+        range: item.range,
+      })
+  }
+  return edited
 }

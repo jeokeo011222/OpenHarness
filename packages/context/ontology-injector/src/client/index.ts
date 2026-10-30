@@ -4,7 +4,7 @@
  * Registers two sidebar/main slots:
  *   - `sidebar.panellist` row with a 2×2 grid icon
  *   - `main` page with the domain rail, upload-and-generate form, graph canvas,
- *     inspector, and version timeline
+ *     inspector, version timeline, and the audit trail
  *
  * The page talks to the Host through the injected `ontologyStore` Remote face,
  * so no filesystem access happens in the browser.

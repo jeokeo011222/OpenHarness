@@ -1,0 +1,13 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write erp-mapping-editor/README.md
+/react-typescript-vite:
+  en: ff8986b8d65d3276
+  zh: b0e59d81160173c9
+/react-typescript-vite/react-compiler:
+  en: dca5a01b7773eee1
+  zh: 684ea4b078a14784
+/react-typescript-vite/expanding-the-oxlint-configuration:
+  en: cef8928eea385b11
+  zh: 86dc0adc208c853e

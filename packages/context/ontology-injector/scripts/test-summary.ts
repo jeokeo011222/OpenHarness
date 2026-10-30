@@ -5,10 +5,9 @@
  * Run with: pnpm exec tsx packages/context/ontology-injector/scripts/test-summary.ts
  * (or just:  node scripts/test-summary.js after build:artifacts)
  */
-import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { listDomains, loadOntology } from '../src/loader.ts'
+import { listDomains, loadOntology, type LoadError } from '../src/loader.ts'
 import { parseOntology, renderSummary, generateSummary } from '../src/summary.ts'
 
 const __dirname = resolve(fileURLToPath(import.meta.url), '..')
@@ -34,7 +33,6 @@ async function main(): Promise<void> {
   console.log('--- 2. loadOntology("contract") ---')
   const loaded = await loadOntology(storePath, 'contract')
   console.log(`Turtle length: ${loaded.turtle.length} chars`)
-  console.log(`Shapes length: ${loaded.shapes.length} chars`)
   if (loaded.turtle.length < 100) {
     console.error('FAIL: turtle content too short')
     exitCode = 1
@@ -57,9 +55,9 @@ async function main(): Promise<void> {
   console.log(summary)
   console.log('OK\n')
 
-  // 4. generateSummary — writes summary.md
-  console.log('--- 4. generateSummary (writes summary.md) ---')
-  const generated = await generateSummary(storePath, 'contract', loaded.turtle)
+  // 4. generateSummary — renders the Markdown summary
+  console.log('--- 4. generateSummary ---')
+  const generated = generateSummary('contract', loaded.turtle)
   console.log(`Generated ${generated.length} chars`)
   if (!generated.includes('当前业务域：contract')) {
     console.error('FAIL: summary missing domain header')
@@ -104,27 +102,23 @@ test:doesSomething a owl:ObjectProperty ;
     await loadOntology(storePath, 'nonexistent')
     console.error('FAIL: should have thrown')
     exitCode = 1
-  } catch (err: any) {
-    console.log(`Caught LoadError: kind=${err.kind}`)
-    if (err.kind !== 'file-missing') {
+  } catch (error) {
+    const loadError = error as LoadError
+    console.log(`Caught LoadError: kind=${loadError.kind}`)
+    if (loadError.kind !== 'domain-missing') {
       console.error('FAIL: wrong error kind')
       exitCode = 1
     }
   }
   console.log('OK\n')
 
-  // 8. Error path — missing registry
-  console.log('--- 8. Error: missing registry ---')
-  try {
-    await listDomains(resolve(storePath, '..', 'nonexistent-store'))
-    console.error('FAIL: should have thrown')
+  // 8. Missing store — no database, so no domains
+  console.log('--- 8. Missing store lists no domains ---')
+  const missingStore = resolve(storePath, '..', 'nonexistent-store')
+  const missingDomains = await listDomains(missingStore)
+  if (missingDomains.length !== 0) {
+    console.error(`FAIL: expected no domains, got ${missingDomains.join(', ')}`)
     exitCode = 1
-  } catch (err: any) {
-    console.log(`Caught LoadError: kind=${err.kind}`)
-    if (err.kind !== 'registry-missing') {
-      console.error('FAIL: wrong error kind')
-      exitCode = 1
-    }
   }
   console.log('OK\n')
 

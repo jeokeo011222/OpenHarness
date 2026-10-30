@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Ontology center",
+    "description": "Store business ontologies in an embedded graph database and inject domain summaries into each turn."
+  }
+}

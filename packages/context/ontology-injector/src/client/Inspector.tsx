@@ -140,6 +140,9 @@ export function Inspector({ graph, selectedId, busy, t, onApply }: InspectorProp
             {node.source.length > 0 && (
               <p className={styles.source}>{t('nodeSource')}: {node.source}</p>
             )}
+            {node.sourceText.length > 0 && (
+              <p className={styles.source}>{t('nodeSourceText')}: {node.sourceText}</p>
+            )}
             <div className={styles.actions}>
               <button type="button" className={styles.buttonPrimary} disabled={busy} onClick={save}>
                 {busy ? t('saving') : t('save')}

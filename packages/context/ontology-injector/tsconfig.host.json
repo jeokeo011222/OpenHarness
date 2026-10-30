@@ -10,9 +10,17 @@
     "src/loader.ts",
     "src/summary.ts",
     "src/injector.ts",
+    "src/tools.ts",
+    "src/analytics.ts",
+    "src/analytics-tools.ts",
     "src/types.ts",
+    "src/analytics-types.ts",
+    "src/acl.ts",
     "src/model.ts",
     "src/store.ts",
+    "src/graph-db.ts",
+    "src/validate.ts",
+    "src/quality.ts",
     "src/extract.ts",
     "src/generate.ts",
     "src/pdfjs.d.ts"
@@ -22,9 +30,12 @@
     { "path": "../../../vendor/schemastery" },
     { "path": "../../llm/llm" },
     { "path": "../../core/agent" },
+    { "path": "../../core/tools" },
     { "path": "../../core/system-prompt" },
     { "path": "../../test-support/loader-smoke" },
     { "path": "../../session/session-projection" },
-    { "path": "../../typert/protocol" }
+    { "path": "../../typert/protocol" },
+    { "path": "../../identity/account-directory" },
+    { "path": "../../api/remote-access/tsconfig.host.json" }
   ]
 }

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Centro de ontologías",
+    "description": "Guarda ontologías de negocio en una base de datos de grafos e inyecta resúmenes de dominio en cada turno."
+  }
+}

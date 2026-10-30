@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Centre d'ontologies",
+    "description": "Stocke les ontologies métier dans une base de données de graphes et injecte un résumé de domaine à chaque tour."
+  }
+}

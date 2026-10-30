@@ -11,16 +11,19 @@
  *      feed results_text back to the model for up to 2 correction retries
  *   5. Write {candidate}.ttl + {candidate}-report.txt to candidates/
  *
- * Does NOT automatically promote to versions/ — promotion is a separate
- * deliberate action handled by publish-ontology.ts.
+ * Does NOT write to the ontology store — promotion is a separate deliberate
+ * action handled by publish-ontology.ts.
  *
  * Usage:
  *   pnpm exec tsx ontology-store/scripts/extract-ontology.ts \
  *     --domain contract \
  *     --input path/to/policy.md \
- *     --skeleton ontology-store/contract/ontology.ttl \
+ *     --skeleton ontology-store/contract/skeleton.ttl \
  *     [--max-retries 2] \
  *     [--model deepseek-chat]
+ *
+ * `--skeleton` names a Turtle file; when that file is absent the domain's live
+ * ontology is read from `graph.db.nq` instead.
  *
  * Env vars:
  *   DEEPSEEK_API_KEY    (required)
@@ -29,9 +32,13 @@
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { argv } from 'node:process'
+import { readLiveTurtle, requireDomainId } from '../../packages/context/ontology-injector/src/store.ts'
+
+const __dirname = resolve(fileURLToPath(import.meta.url), '..')
 
 // --- Argument parsing ---
 
@@ -78,7 +85,6 @@ function sliceByClauses(text: string): TextSlice[] {
   // Match Chinese legal-style clauses: "第12条" / "第一章" / § 12
   const clauseRegex = /(第[一二三四五六七八九十百千万零\d]+[章节条款部分卷编篇])|(§\s*\d+)/g
   const slices: TextSlice[] = []
-  let lastIdx = 0
   let match: RegExpExecArray | null
   const markers: Array<{ clause: string; index: number }> = []
   while ((match = clauseRegex.exec(text)) !== null) {
@@ -206,6 +212,26 @@ function shaclValidate(candidateTtlPath: string, shapesTtlPath: string): Promise
   })
 }
 
+// --- Skeleton ---
+
+/**
+ * Read the Turtle skeleton candidates must reuse: the file named by
+ * `--skeleton` when it exists, otherwise the domain's live ontology.
+ * @param root - ontology store root.
+ * @param domain - target domain id.
+ * @param skeletonPath - path named by `--skeleton`.
+ * @returns the skeleton Turtle.
+ * @throws {Error} when neither the file nor a live ontology exists.
+ */
+async function loadSkeleton(root: string, domain: string, skeletonPath: string): Promise<string> {
+  if (existsSync(skeletonPath)) return await readFile(skeletonPath, 'utf8')
+  const live = await readLiveTurtle(root, domain)
+  if (live.trim().length === 0) {
+    throw new Error(`Skeleton not found: ${skeletonPath} (domain ${domain} has no live ontology)`)
+  }
+  return live
+}
+
 // --- Main pipeline ---
 
 async function main(): Promise<void> {
@@ -225,13 +251,18 @@ async function main(): Promise<void> {
   const candidatesDir = join(storeRoot, 'candidates')
 
   if (!existsSync(inputPath)) { console.error(`Input not found: ${inputPath}`); process.exit(1) }
-  if (!existsSync(skeletonPath)) { console.error(`Skeleton not found: ${skeletonPath}`); process.exit(1) }
+  try {
+    requireDomainId(args.domain)
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exit(1)
+  }
   if (!existsSync(shapesPath)) { console.warn(`shapes.ttl not found at ${shapesPath}; SHACL step will be skipped`) }
 
   await mkdir(candidatesDir, { recursive: true })
 
   const inputText = await readFile(inputPath, 'utf8')
-  const skeleton = await readFile(skeletonPath, 'utf8')
+  const skeleton = await loadSkeleton(storeRoot, args.domain, skeletonPath)
 
   // 1. Slice
   const slices = sliceByClauses(inputText)

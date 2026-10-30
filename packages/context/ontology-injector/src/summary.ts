@@ -10,8 +10,6 @@
  * contains blank entries.
  */
 
-import { writeFile, stat } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
 import { Store, parse as rdflibParse, namedNode, type NamedNode } from 'rdflib'
 
 /** A single extracted OWL class. */
@@ -169,34 +167,12 @@ export function renderSummary(domain: string, parsed: ParsedOntology): string {
 }
 
 /**
- * Write the summary.md file and return the rendered string.
- * @param storePath - the ontology store root.
- * @param domain - the business domain id.
+ * Render the Markdown summary of one domain's live graph.
+ * @param domain - the business domain id used in the heading.
  * @param turtle - the live ontology Turtle.
  * @returns the rendered Markdown summary.
  */
-export async function generateSummary(storePath: string, domain: string, turtle: string): Promise<string> {
+export function generateSummary(domain: string, turtle: string): string {
   const parsed = parseOntology(turtle)
-  const rendered = renderSummary(domain, parsed)
-  const summaryPath = join(resolve(storePath), domain, 'summary.md')
-  await writeFile(summaryPath, rendered, 'utf8')
-  return rendered
-}
-
-/**
- * Report whether the cached summary is stale.
- * @param summaryPath - absolute path of the cached summary.md.
- * @param ontologyPath - absolute path of the live ontology.ttl.
- * @returns `true` when the summary is missing or older than the ontology.
- */
-export async function summaryNeedsRefresh(summaryPath: string, ontologyPath: string): Promise<boolean> {
-  let summaryStat
-  try {
-    summaryStat = await stat(summaryPath)
-  } catch (cause) {
-    if ((cause as NodeJS.ErrnoException).code === 'ENOENT') return true
-    throw cause
-  }
-  const ontologyStat = await stat(ontologyPath)
-  return summaryStat.mtimeMs < ontologyStat.mtimeMs
+  return renderSummary(domain, parsed)
 }

@@ -7,14 +7,18 @@
  *   - Auto-status marking: ready-for-confirm / manual-intervention-needed
  *   - SHACL retry (up to 3) before giving up
  *
- * Does NOT write to versions/ — that remains the sole job of confirm-ontology.ts.
+ * Does NOT write to the ontology store — snapshotting remains the sole job of
+ * confirm-ontology.ts.
  *
  * Usage:
  *   pnpm exec tsx ontology-store/scripts/generate-ontology.ts \
  *     --domain contract \
  *     --source ./合同管理办法.md \
- *     --skeleton ontology-store/contract/ontology.ttl \
+ *     --skeleton ontology-store/contract/skeleton.ttl \
  *     [--max-retries 3]
+ *
+ * `--skeleton` names a Turtle file; when that file is absent the domain's live
+ * ontology is read from `graph.db.nq` instead.
  *
  * Env vars:
  *   DEEPSEEK_API_KEY    (required)
@@ -23,10 +27,13 @@
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join, resolve, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { existsSync } from 'node:fs'
-import { spawn } from 'node:child_process'
+import { spawn, execSync } from 'node:child_process'
 import { argv } from 'node:process'
-import { execSync } from 'node:child_process'
+import { readLiveTurtle, requireDomainId } from '../../packages/context/ontology-injector/src/store.ts'
+
+const __dirname = resolve(fileURLToPath(import.meta.url), '..')
 
 // --- Arg parsing ---
 
@@ -164,6 +171,26 @@ function tryGitHash(cwd: string): string {
   try { return execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim() } catch { return 'n/a' }
 }
 
+// --- Skeleton ---
+
+/**
+ * Read the Turtle skeleton candidates must reuse: the file named by
+ * `--skeleton` when it exists, otherwise the domain's live ontology.
+ * @param root - ontology store root.
+ * @param domain - target domain id.
+ * @param skeletonPath - path named by `--skeleton`.
+ * @returns the skeleton Turtle.
+ * @throws {Error} when neither the file nor a live ontology exists.
+ */
+async function loadSkeleton(root: string, domain: string, skeletonPath: string): Promise<string> {
+  if (existsSync(skeletonPath)) return await readFile(skeletonPath, 'utf8')
+  const live = await readLiveTurtle(root, domain)
+  if (live.trim().length === 0) {
+    throw new Error(`Skeleton not found: ${skeletonPath} (domain ${domain} has no live ontology)`)
+  }
+  return live
+}
+
 // --- Main ---
 
 async function main(): Promise<void> {
@@ -180,12 +207,17 @@ async function main(): Promise<void> {
   const candidatesDir = join(storeRoot, 'candidates')
 
   if (!existsSync(inputPath)) { console.error(`Input not found: ${inputPath}`); process.exit(1) }
-  if (!existsSync(skeletonPath)) { console.error(`Skeleton not found: ${skeletonPath}`); process.exit(1) }
+  try {
+    requireDomainId(args.domain)
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exit(1)
+  }
 
   await mkdir(candidatesDir, { recursive: true })
 
   const inputText = await readFile(inputPath, 'utf8')
-  const skeleton = await readFile(skeletonPath, 'utf8')
+  const skeleton = await loadSkeleton(storeRoot, args.domain, skeletonPath)
   const slices = sliceByClauses(inputText)
   console.log(`[1/4] Sliced input into ${slices.length} clause groups`)
 

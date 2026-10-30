@@ -1,113 +1,51 @@
 /**
- * File-based ontology loader.
+ * Ontology loader over the embedded graph database.
  *
- * Reads Turtle (.ttl) ontology and SHACL shape files from a configured
- * store directory. This module is pure Node.js — no Harness dependency —
- * so it can be tested independently.
- *
- * Expected layout:
- *   {store}/
- *   ├── registry.json                    {"domains": ["contract", ...]}
- *   └── {domain}/
- *       ├── ontology.ttl
- *       └── shapes.ttl
+ * The live graph and the domain registry live in `<store>/graph.db.nq`; see
+ * `store.ts`. This module only adapts them into the shape the injection path
+ * consumes, so the pre-step listener stays free of storage details.
  */
 
-import { readFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { readDomainMeta, readLiveTurtle, readRegistry } from './store.ts'
 
-/** Thrown when a required ontology file is missing or unreadable. */
+/** Thrown when a requested domain has no graph in the database. */
 export interface LoadError extends Error {
-  kind: 'registry-missing' | 'domain-missing' | 'file-missing'
-  path: string
-}
-
-function makeLoadError(kind: LoadError['kind'], path: string, message: string): LoadError {
-  const error = new Error(message) as LoadError
-  error.kind = kind
-  error.path = path
-  return error
+  kind: 'domain-missing'
+  domain: string
 }
 
 /**
- * Read registry.json and return the declared domain list.
+ * Read the registered domain ids.
  * @param storePath - root ontology store directory.
- * @returns the declared domain ids.
- * @throws {LoadError} when the registry is missing, unreadable, or malformed.
+ * @returns the registered domain ids, empty when none exists.
  */
 export async function listDomains(storePath: string): Promise<string[]> {
-  const registryPath = join(resolve(storePath), 'registry.json')
-  let raw: string
-  try {
-    raw = await readFile(registryPath, 'utf8')
-  } catch (cause) {
-    throw makeLoadError('registry-missing', registryPath,
-      `ontology-injector: cannot read registry.json at ${registryPath}: ${(cause as Error).message}`)
-  }
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
-  } catch (cause) {
-    throw makeLoadError('registry-missing', registryPath,
-      `ontology-injector: registry.json at ${registryPath} is not valid JSON: ${(cause as Error).message}`)
-  }
-  if (typeof parsed !== 'object' || parsed === null || !('domains' in parsed)) {
-    throw makeLoadError('registry-missing', registryPath,
-      `ontology-injector: registry.json at ${registryPath} missing "domains" field`)
-  }
-  const domains = parsed.domains
-  if (!Array.isArray(domains) || !domains.every((entry): entry is string => typeof entry === 'string')) {
-    throw makeLoadError('registry-missing', registryPath,
-      'ontology-injector: registry.json "domains" must be a string array')
-  }
-  return domains
+  return await readRegistry(storePath)
 }
 
-/** Ontology source pair returned by {@link loadOntology}. */
+/** Ontology content returned by {@link loadOntology}. */
 export interface OntologySources {
   /** Raw Turtle content of the domain's OWL ontology. */
   turtle: string
-  /** Raw Turtle content of the domain's SHACL shapes. May be empty if absent. */
-  shapes: string
-  /** Resolved absolute path to the ontology.ttl file. Used for cache mtime comparison. */
-  ontologyPath: string
+  /** Domain revision stamp the content was read at, used to key the summary cache. */
+  revision: string
 }
 
 /**
- * Read the .ttl files for one business domain.
- * @param storePath - root ontology store directory (containing registry.json).
+ * Read the live graph of one business domain.
+ * @param storePath - root ontology store directory.
  * @param domain - business domain name, e.g. "contract".
- * @returns the domain's ontology, optional shapes, and ontology path.
- * @throws {LoadError} when the directory or ontology.ttl is missing.
+ * @returns the domain's live Turtle plus its revision stamp.
+ * @throws {LoadError} when the domain has no live graph.
  */
 export async function loadOntology(storePath: string, domain: string): Promise<OntologySources> {
-  const absStore = resolve(storePath)
-  const domainDir = join(absStore, domain)
-  const ontologyPath = join(domainDir, 'ontology.ttl')
-  const shapesPath = join(domainDir, 'shapes.ttl')
-
-  let turtle: string
-  try {
-    turtle = await readFile(ontologyPath, 'utf8')
-  } catch (cause) {
-    if ((cause as NodeJS.ErrnoException).code === 'ENOENT') {
-      throw makeLoadError('file-missing', ontologyPath,
-        `ontology-injector: ontology.ttl not found at ${ontologyPath}`)
-    }
-    throw makeLoadError('file-missing', ontologyPath,
-      `ontology-injector: cannot read ${ontologyPath}: ${(cause as Error).message}`)
+  const turtle = await readLiveTurtle(storePath, domain)
+  if (turtle.trim().length === 0) {
+    const error = new Error(`ontology-injector: no live graph for domain ${domain}`) as LoadError
+    error.kind = 'domain-missing'
+    error.domain = domain
+    throw error
   }
-
-  let shapes = ''
-  try {
-    shapes = await readFile(shapesPath, 'utf8')
-  } catch (cause) {
-    // shapes.ttl is optional; absence is fine for the loader layer.
-    if ((cause as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw makeLoadError('file-missing', shapesPath,
-        `ontology-injector: cannot read ${shapesPath}: ${(cause as Error).message}`)
-    }
-  }
-
-  return { turtle, shapes, ontologyPath }
+  const meta = await readDomainMeta(storePath, domain)
+  return { turtle, revision: meta.updatedAt }
 }

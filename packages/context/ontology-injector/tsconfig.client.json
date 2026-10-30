@@ -8,14 +8,18 @@
   },
   "files": [
     "src/types.ts",
+    "src/analytics-types.ts",
     "src/css-modules.d.ts",
     "src/client/index.ts",
     "src/client/face.ts",
     "src/client/layout.ts",
     "src/client/locales.ts",
     "src/client/OntologyIcon.tsx",
+    "src/client/ConfirmDialog.tsx",
     "src/client/GraphCanvas.tsx",
     "src/client/Inspector.tsx",
+    "src/client/panels.tsx",
+    "src/client/AnalyticsPanel.tsx",
     "src/client/VersionsPanel.tsx",
     "src/client/Workbench.tsx"
   ],

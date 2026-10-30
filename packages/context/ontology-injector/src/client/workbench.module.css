@@ -72,6 +72,11 @@
   min-height: 0;
 }
 
+/* Removing the side column gives the canvas the whole row. */
+.graphBodyCollapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .main,
 .side {
   display: flex;
@@ -248,6 +253,54 @@
   border-top: 1px solid var(--dsw-alias-border-l2);
 }
 
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.mask {
+  position: absolute;
+  inset: 0;
+  background: var(--dsw-alias-bg-mask-1);
+  backdrop-filter: var(--dsw-mask-blur);
+}
+
+.dialog {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(480px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 20px 24px 24px;
+  border-radius: var(--dsw-radius-panel);
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: var(--dsw-elevation-prominent);
+}
+
+.dialogTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.dialogActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .fileInput {
   font-size: 12px;
   color: var(--dsw-alias-label-secondary);
@@ -285,6 +338,8 @@
   width: 100%;
   height: auto;
   background: transparent;
+  cursor: grab;
+  touch-action: none;
 }
 
 .node {
@@ -438,6 +493,19 @@
   border: 1px solid var(--dsw-alias-brand-primary);
 }
 
+.versionStatus {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--dsw-alias-label-secondary);
+  border: 1px solid var(--dsw-alias-label-tertiary);
+}
+
+.versionStatus[data-status='published'] {
+  color: var(--dsw-alias-brand-primary);
+  border-color: var(--dsw-alias-brand-primary);
+}
+
 .compareRow {
   display: flex;
   align-items: center;
@@ -477,4 +545,283 @@
   font-size: 11px;
   word-break: break-all;
   color: var(--dsw-alias-label-secondary);
+}
+
+.versionActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.health {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.healthLabel {
+  padding: 1px 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.panelSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.table th,
+.table td {
+  padding: 4px 6px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-secondary);
+  word-break: break-word;
+}
+
+.table th {
+  color: var(--dsw-alias-label-tertiary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.issueList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.issue {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.issueError {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.issueWarning {
+  color: var(--dsw-alias-state-warn-label);
+}
+
+.issueCode {
+  font-family: var(--dsw-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.issueSubject {
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.errorLine {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.canvasHost {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+}
+
+.canvasControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.searchInput {
+  width: min(260px, 100%);
+}
+
+.toggleGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.canvasPanning {
+  cursor: grabbing;
+}
+
+.nodeDim,
+.edgeDim {
+  opacity: 0.3;
+}
+
+.nodeMatch rect {
+  stroke-width: 3;
+}
+
+.analysisBar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filterRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.filterField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.filterInput {
+  padding: 4px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+
+.metricCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+}
+
+.metricTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.metricValue {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.metricBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.barCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.barTrack {
+  width: 90px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-multi-select);
+  overflow: hidden;
+  flex: none;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--dsw-alias-brand-primary);
+}
+
+.caveat {
+  font-size: 11px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.caveat summary {
+  cursor: pointer;
+}
+
+.batchList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.batchItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.sparql {
+  margin: 6px 0 0;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-base);
+  overflow: auto;
+  max-height: 240px;
+  font-size: 11px;
+  white-space: pre-wrap;
 }

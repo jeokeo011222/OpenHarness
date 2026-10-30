@@ -46,4 +46,5 @@ apps/web/dist/
 worktrees/
 .agents/worktrees/
 .typert-*/
+ontology-store/graph.db.nq
 native/system/test/bin/

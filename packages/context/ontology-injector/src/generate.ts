@@ -16,6 +16,8 @@ export interface GenerationSettings {
   readonly baseUrl: string
   readonly model: string
   readonly maxClauses: number
+  /** Character budget for the clause text stored on each node. */
+  readonly maxEvidenceChars: number
 }
 
 /** Result of one clause extraction attempt. */
@@ -41,6 +43,17 @@ export interface TextSlice {
 
 const CLAUSE_MARKER = /(第[一二三四五六七八九十百千万零\d]+[章节条款部分卷编篇])|(§\s*\d+)/g
 const NUMBERED_MARKER = /(^|\n)\s*\d+\.\s+/g
+
+/**
+ * Collapse whitespace and cap a clause body for storage on each node.
+ * @param text - the full clause body.
+ * @param limit - maximum stored characters.
+ * @returns the excerpt, empty when the clause has no text.
+ */
+function evidenceOf(text: string, limit: number): string {
+  const collapsed = text.replace(/\s+/g, ' ').trim()
+  return collapsed.length > limit ? `${collapsed.slice(0, limit)}…` : collapsed
+}
 
 /**
  * Slice a document into clause groups, falling back to numbered paragraphs.
@@ -231,7 +244,7 @@ export async function generateOntology(
     signal?.throwIfAborted()
     try {
       const extraction = await requestExtraction(settings, merged, slice, signal)
-      const added = mergeExtraction(merged, extraction, slice.clause)
+      const added = mergeExtraction(merged, extraction, slice.clause, evidenceOf(slice.text, settings.maxEvidenceChars))
       outcomes.push({ clause: slice.clause, added: added.length, error: '' })
       succeeded += 1
       steps.push({

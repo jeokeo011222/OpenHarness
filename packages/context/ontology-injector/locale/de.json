@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Ontologie-Zentrum",
+    "description": "Speichert Geschäftsontologien in einer Graphdatenbank und injiziert in jedem Zug eine Domänenzusammenfassung."
+  }
+}

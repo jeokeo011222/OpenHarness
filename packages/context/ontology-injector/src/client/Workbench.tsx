@@ -1,9 +1,24 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import type { OntologyEdit, OntologyGraph, OntologyVersionDiff, OntologyVersionSummary, OntologyDomainSummary, GenerationStep, GenerateRequest } from '../types.ts'
+import type {
+  AuditEntry,
+  OntologyDomainSummary,
+  OntologyEdit,
+  OntologyGraph,
+  OntologyHealth,
+  OntologyPatch,
+  OntologyVersionDiff,
+  OntologyVersionSummary,
+  QualityReport,
+  SparqlResult,
+  ValidationReport,
+} from '../types.ts'
 import type { OntologyStoreFace } from './face.ts'
-import { messageOf, unwrap } from './face.ts'
+import { messageOf, unwrap, StoreCallError } from './face.ts'
+import { ConfirmDialog } from './ConfirmDialog.tsx'
 import { GraphCanvas } from './GraphCanvas.tsx'
 import { Inspector, type Translate } from './Inspector.tsx'
+import { AuditPanel, HealthLine, PatchDialog, QualityPanel, SparqlConsole, ValidationPanel } from './panels.tsx'
+import { AnalyticsPanel } from './AnalyticsPanel.tsx'
 import { VersionsPanel } from './VersionsPanel.tsx'
 import styles from './workbench.module.css'
 
@@ -26,22 +41,27 @@ async function readBase64(file: File): Promise<string> {
   return btoa(binary)
 }
 
-/** Status glyph for one generation stage. */
-function stepGlyph(status: GenerationStep['status']): string {
-  if (status === 'done') return '✓'
-  if (status === 'failed') return '✗'
-  return '–'
+/** Save one text file through a temporary object URL. */
+function downloadText(fileName: string, text: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/turtle' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = fileName
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
 }
 
 /**
- * Two-tab ontology center: the domain list with create/rename/disable actions,
- * and the graph workbench with upload-and-generate, the canvas, the inspector,
- * and the version timeline.
+ * Three-tab ontology center: the domain list with create/rename/disable
+ * actions, the graph workbench with the canvas, the inspector, and the version
+ * timeline, and the audit trail. Upload-and-generate lives in the create dialog.
  *
  * @param props - Remote face and copy.
  */
 export function Workbench({ store, t }: WorkbenchProps): ReactNode {
-  const [tab, setTab] = useState<'ontologies' | 'graph'>('ontologies')
+  const [tab, setTab] = useState<'ontologies' | 'graph' | 'analysis' | 'audit'>('ontologies')
   const [domains, setDomains] = useState<OntologyDomainSummary[]>([])
   const [activeDomain, setActiveDomain] = useState<string | null>(null)
   const [graph, setGraph] = useState<OntologyGraph | null>(null)
@@ -50,31 +70,61 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [fileName, setFileName] = useState('')
-  const [contentBase64, setContentBase64] = useState('')
-  const [steps, setSteps] = useState<GenerationStep[]>([])
   const [warnings, setWarnings] = useState<string[]>([])
   const [draftId, setDraftId] = useState('')
   const [draftLabel, setDraftLabel] = useState('')
-  const [creating, setCreating] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createFileName, setCreateFileName] = useState('')
+  const [createContentBase64, setCreateContentBase64] = useState('')
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [createdId, setCreatedId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editLabel, setEditLabel] = useState('')
+  const [health, setHealth] = useState<OntologyHealth | null>(null)
+  const [audit, setAudit] = useState<AuditEntry[]>([])
+  const [pendingDelete, setPendingDelete] = useState<OntologyDomainSummary | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importDomain, setImportDomain] = useState('')
+  const [importNote, setImportNote] = useState('')
+  const [importFileName, setImportFileName] = useState('')
+  const [importText, setImportText] = useState('')
+  const [importError, setImportError] = useState<string | null>(null)
+  const [validation, setValidation] = useState<ValidationReport | null>(null)
+  const [validationOpen, setValidationOpen] = useState(false)
+  const [sparqlOpen, setSparqlOpen] = useState(false)
+  const [patchOpen, setPatchOpen] = useState(false)
+  const [qualityOpen, setQualityOpen] = useState(false)
+  /** Side column holds the inspector and version list; collapsing it gives the graph the whole width. */
+  const [sideOpen, setSideOpen] = useState(true)
 
   const activeSummary = domains.find(item => item.id === activeDomain) ?? null
 
   const refreshDomains = async (): Promise<OntologyDomainSummary[]> => {
-    const list = unwrap(await store.listDomains())
+    const [listed, snapshot] = await Promise.all([store.listDomains(), store.health()])
+    const list = unwrap(listed)
     setDomains(list)
+    setHealth(unwrap(snapshot))
     return list
+  }
+
+  const refreshAudit = async (): Promise<void> => {
+    setAudit(unwrap(await store.auditLog(50)))
   }
 
   useEffect(() => {
     const live = { value: true }
     void (async () => {
       try {
-        const list = unwrap(await store.listDomains())
+        const [listed, snapshot, entries] = await Promise.all([
+          store.listDomains(),
+          store.health(),
+          store.auditLog(50),
+        ])
         if (!live.value) return
+        const list = unwrap(listed)
         setDomains(list)
+        setHealth(unwrap(snapshot))
+        setAudit(unwrap(entries))
         setActiveDomain(current => current ?? list.at(0)?.id ?? null)
       } catch (failure) {
         if (live.value) setError(messageOf(failure))
@@ -82,6 +132,25 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
     })()
     return () => { live.value = false }
   }, [store])
+
+  useEffect(() => {
+    if (tab !== 'audit') return undefined
+    const live = { value: true }
+    void refreshAudit().catch((failure: unknown) => {
+      if (live.value) setError(messageOf(failure))
+    })
+    return () => { live.value = false }
+    // Audit entries change after metric runs in the analysis tab.
+  }, [tab])
+
+  useEffect(() => {
+    if (!importOpen) return undefined
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape' && busy === null) setImportOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('keydown', onKey) }
+  }, [importOpen, busy])
 
   useEffect(() => {
     if (activeDomain === null) {
@@ -101,6 +170,11 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
         setVersions(unwrap(loadedVersions))
         setSelectedId(null)
         setDiff(null)
+        setValidation(null)
+        setValidationOpen(false)
+        setSparqlOpen(false)
+        setPatchOpen(false)
+        setQualityOpen(false)
       } catch (failure) {
         if (live.value) setError(messageOf(failure))
       }
@@ -117,22 +191,68 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
     setVersions(unwrap(await store.listVersions(domain)))
   }
 
-  const createDomain = async (): Promise<void> => {
+  const openCreate = (): void => {
+    setDraftId('')
+    setDraftLabel('')
+    setCreateFileName('')
+    setCreateContentBase64('')
+    setCreateError(null)
+    setCreatedId(null)
+    setCreateOpen(true)
+  }
+
+  const closeCreate = (): void => {
+    if (busy !== null) return
+    setCreateOpen(false)
+  }
+
+  const pickCreateFile = async (file: File | undefined): Promise<void> => {
+    if (file === undefined) return
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setCreateError(`${file.name}: ${file.size} > ${MAX_UPLOAD_BYTES}`)
+      return
+    }
+    setCreateError(null)
+    setCreateFileName(file.name)
+    setCreateContentBase64(await readBase64(file))
+  }
+
+  /**
+   * Create the drafted domain and, when a document is attached, generate its
+   * first ontology in the same dialog. A domain already created by a failed
+   * generate attempt is reused so a retry only repeats the generation.
+   *
+   * @param withDocument - also upload the attached document and generate.
+   */
+  const submitCreate = async (withDocument: boolean): Promise<void> => {
     const id = draftId.trim()
     if (id.length === 0) return
-    setCreating(true)
-    setBusy('create')
-    setError(null)
+    setCreateError(null)
+    setBusy(withDocument ? 'create-generate' : 'create')
     try {
-      unwrap(await store.createDomain(id, draftLabel.trim() || id))
-      await refreshDomains()
-      setActiveDomain(id)
-      setDraftId('')
-      setDraftLabel('')
-      setCreating(false)
-      setTab('graph')
+      if (createdId !== id) {
+        unwrap(await store.createDomain(id, draftLabel.trim() || id))
+        setCreatedId(id)
+        await refreshDomains()
+      }
+      if (withDocument) {
+        const result = unwrap(await store.generate({
+          domain: id,
+          label: draftLabel.trim() || id,
+          fileName: createFileName,
+          contentBase64: createContentBase64,
+        }))
+        setActiveDomain(id)
+        setWarnings([...result.warnings])
+        await refreshDomains()
+        setCreateOpen(false)
+        setTab('graph')
+      } else {
+        setCreateOpen(false)
+      }
+      await refreshAudit()
     } catch (failure) {
-      report(failure)
+      setCreateError(messageOf(failure))
     } finally {
       setBusy(null)
     }
@@ -153,6 +273,7 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
       await store.updateDomain(editingId, { label })
       await refreshDomains()
       if (activeDomain === editingId) await reloadGraph(editingId)
+      await refreshAudit()
       setEditingId(null)
       setEditLabel('')
     } catch (failure) {
@@ -168,6 +289,7 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
     try {
       await store.updateDomain(domain.id, { disabled: !domain.disabled })
       await refreshDomains()
+      await refreshAudit()
     } catch (failure) {
       report(failure)
     } finally {
@@ -180,42 +302,9 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
     setTab('graph')
   }
 
-  const pickFile = async (file: File | undefined): Promise<void> => {
-    if (file === undefined) return
-    if (file.size > MAX_UPLOAD_BYTES) {
-      setError(`${file.name}: ${file.size} > ${MAX_UPLOAD_BYTES}`)
-      return
-    }
-    setFileName(file.name)
-    setContentBase64(await readBase64(file))
-  }
-
-  const generate = async (): Promise<void> => {
-    if (activeDomain === null || contentBase64.length === 0) return
-    setBusy('generate')
-    setError(null)
-    setSteps([])
-    setWarnings([])
-    try {
-      const request: GenerateRequest = {
-        domain: activeDomain,
-        label: activeSummary?.label ?? activeDomain,
-        fileName,
-        contentBase64,
-      }
-      const result = unwrap(await store.generate(request))
-      setGraph(result.graph)
-      setSteps([...result.steps])
-      setWarnings([...result.warnings])
-      setSelectedId(null)
-      const loadedVersions = unwrap(await store.listVersions(activeDomain))
-      setVersions(loadedVersions)
-      await refreshDomains()
-    } catch (failure) {
-      report(failure)
-    } finally {
-      setBusy(null)
-    }
+  const analyzeDomain = (domain: OntologyDomainSummary): void => {
+    setActiveDomain(domain.id)
+    setTab('analysis')
   }
 
   const applyEdits = async (edits: OntologyEdit[]): Promise<void> => {
@@ -229,6 +318,7 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
       if (result.graph.nodes.every(node => node.id !== selectedId)) setSelectedId(null)
       setVersions(unwrap(await store.listVersions(activeDomain)))
       await refreshDomains()
+      await refreshAudit()
     } catch (failure) {
       report(failure)
     } finally {
@@ -236,15 +326,57 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
     }
   }
 
-  const activate = async (version: string): Promise<void> => {
+  const applyPatch = async (patch: OntologyPatch): Promise<void> => {
     if (activeDomain === null) return
-    setBusy(`activate:${version}`)
+    setBusy('patch')
     setError(null)
     try {
-      setGraph(unwrap(await store.activateVersion(activeDomain, version)))
+      const result = unwrap(await store.applyPatch(activeDomain, patch))
+      setGraph(result.graph)
+      if (result.warnings.length > 0) setWarnings([...result.warnings])
+      if (result.graph.nodes.every(node => node.id !== selectedId)) setSelectedId(null)
       setVersions(unwrap(await store.listVersions(activeDomain)))
+      setPatchOpen(false)
+      await refreshDomains()
+      await refreshAudit()
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const evaluate = async (goldTurtle: string, baselineName: string): Promise<QualityReport> => {
+    const domain = activeDomain
+    if (domain === null) throw new StoreCallError('ontology/not-found', t('selectDomain'))
+    const outcome = unwrap(await store.evaluateQuality(domain, goldTurtle, baselineName))
+    await refreshAudit()
+    return outcome
+  }
+
+  const submitReview = async (version: string): Promise<void> => {
+    if (activeDomain === null) return
+    setBusy(`submit-review:${version}`)
+    setError(null)
+    try {
+      setVersions(unwrap(await store.submitReview(activeDomain, version)))
+      await refreshDomains()
+      await refreshAudit()
+    } catch (failure) {
+      report(failure)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const publish = async (version: string): Promise<void> => {
+    if (activeDomain === null) return
+    setBusy(`publish:${version}`)
+    setError(null)
+    try {
+      setVersions(unwrap(await store.publishVersion(activeDomain, version)))
+      setGraph(unwrap(await store.graph(activeDomain)))
       setDiff(null)
       await refreshDomains()
+      await refreshAudit()
     } catch (failure) {
       report(failure)
     } finally {
@@ -262,6 +394,141 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
     }
   }
 
+  const reloadAll = async (): Promise<void> => {
+    setError(null)
+    try {
+      await refreshDomains()
+      await refreshAudit()
+    } catch (failure) {
+      report(failure)
+    }
+  }
+
+  const downloadDomain = async (domain: OntologyDomainSummary): Promise<void> => {
+    setBusy(`export:${domain.id}`)
+    setError(null)
+    try {
+      const turtle = unwrap(await store.exportDomain(domain.id, 'text/turtle'))
+      downloadText(`${domain.id}.ttl`, turtle)
+      await refreshAudit()
+    } catch (failure) {
+      report(failure)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const openImport = (): void => {
+    setImportDomain(activeDomain ?? domains.at(0)?.id ?? '')
+    setImportNote('')
+    setImportFileName('')
+    setImportText('')
+    setImportError(null)
+    setImportOpen(true)
+  }
+
+  const closeImport = (): void => {
+    if (busy !== null) return
+    setImportOpen(false)
+  }
+
+  const pickImportFile = async (file: File | undefined): Promise<void> => {
+    if (file === undefined) return
+    try {
+      setImportError(null)
+      setImportFileName(file.name)
+      setImportText(await file.text())
+    } catch (failure) {
+      setImportError(messageOf(failure))
+    }
+  }
+
+  const submitImport = async (): Promise<void> => {
+    const id = importDomain.trim()
+    if (id.length === 0 || importText.length === 0 || importNote.trim().length === 0) return
+    setImportError(null)
+    setBusy('import')
+    try {
+      const imported = unwrap(await store.importOntology(id, importText, importNote.trim()))
+      setActiveDomain(id)
+      setGraph(imported)
+      setSelectedId(null)
+      setVersions(unwrap(await store.listVersions(id)))
+      setDiff(null)
+      setImportOpen(false)
+      setTab('graph')
+      await refreshDomains()
+      await refreshAudit()
+    } catch (failure) {
+      setImportError(messageOf(failure))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const confirmDeleteDomain = async (): Promise<void> => {
+    const target = pendingDelete
+    if (target === null) return
+    setBusy(`delete:${target.id}`)
+    setError(null)
+    try {
+      unwrap(await store.deleteDomain(target.id))
+      setPendingDelete(null)
+      const list = await refreshDomains()
+      await refreshAudit()
+      if (activeDomain === target.id) {
+        setActiveDomain(list.at(0)?.id ?? null)
+        setGraph(null)
+        setVersions([])
+        setSelectedId(null)
+      }
+    } catch (failure) {
+      report(failure)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const removeVersion = async (version: string, force: boolean): Promise<void> => {
+    if (activeDomain === null) return
+    setBusy(`delete-version:${version}`)
+    setError(null)
+    try {
+      setVersions(unwrap(await store.deleteVersion(activeDomain, version, force)))
+      setGraph(unwrap(await store.graph(activeDomain)))
+      setDiff(null)
+      setSelectedId(null)
+      await refreshDomains()
+      await refreshAudit()
+    } catch (failure) {
+      report(failure)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const runValidation = async (): Promise<void> => {
+    if (activeDomain === null) return
+    setBusy('validate')
+    setError(null)
+    try {
+      const outcome = unwrap(await store.validateDomain(activeDomain))
+      setValidation(outcome)
+      setValidationOpen(true)
+      await refreshAudit()
+    } catch (failure) {
+      report(failure)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const runSparql = async (sparql: string): Promise<SparqlResult> => {
+    const domain = activeDomain
+    if (domain === null) throw new StoreCallError('ontology/not-found', t('selectDomain'))
+    return unwrap(await store.queryDomain(domain, sparql))
+  }
+
   const graphSignature = graph === null ? '' : `${graph.domain}:${graph.version ?? ''}:${graph.nodes.length}:${graph.edges.length}`
   const versionsSignature = versions.map(item => item.version).join(',')
 
@@ -272,7 +539,7 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
           <h1 className={styles.title}>{t('title')}</h1>
           <p className={styles.subtitle}>{t('subtitle')}</p>
         </div>
-        <button type="button" className={styles.button} onClick={() => { void refreshDomains() }}>
+        <button type="button" className={styles.button} onClick={() => { void reloadAll() }}>
           {t('reload')}
         </button>
       </header>
@@ -302,6 +569,24 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
           onClick={() => { setTab('graph') }}
         >
           {t('tabGraph')}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'analysis'}
+          className={`${styles.tab}${tab === 'analysis' ? ` ${styles.tabActive}` : ''}`}
+          onClick={() => { setTab('analysis') }}
+        >
+          {t('tabAnalysis')}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'audit'}
+          className={`${styles.tab}${tab === 'audit' ? ` ${styles.tabActive}` : ''}`}
+          onClick={() => { setTab('audit') }}
+        >
+          {t('tabAudit')}
         </button>
       </div>
 
@@ -352,6 +637,9 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
                         )
                         : (
                           <>
+                            <button type="button" className={styles.button} onClick={() => { analyzeDomain(domain) }}>
+                              {t('analyze')}
+                            </button>
                             <button type="button" className={styles.button} onClick={() => { viewDomain(domain) }}>
                               {t('view')}
                             </button>
@@ -368,6 +656,22 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
                                 ? t('saving')
                                 : domain.disabled ? t('enable') : t('disable')}
                             </button>
+                            <button
+                              type="button"
+                              className={styles.button}
+                              disabled={busy !== null}
+                              onClick={() => { void downloadDomain(domain) }}
+                            >
+                              {busy === `export:${domain.id}` ? t('exporting') : t('export')}
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.button}
+                              disabled={busy !== null}
+                              onClick={() => { setPendingDelete(domain) }}
+                            >
+                              {t('remove')}
+                            </button>
                           </>
                         )}
                     </div>
@@ -377,32 +681,160 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
             )}
           <p className={styles.hint}>{t('disableHint')}</p>
 
+          <HealthLine health={health} t={t} />
+
           <div className={styles.addSection}>
-            {creating
-              ? (
-                <div className={styles.form}>
-                  <h4 className={styles.sectionTitle}>{t('newDomain')}</h4>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>{t('domainId')}</span>
-                    <input className={styles.input} value={draftId} onChange={(event) => { setDraftId(event.target.value) }} />
-                  </label>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>{t('domainLabel')}</span>
-                    <input className={styles.input} value={draftLabel} onChange={(event) => { setDraftLabel(event.target.value) }} />
-                  </label>
-                  <div className={styles.actions}>
-                    <button type="button" className={styles.buttonPrimary} disabled={busy !== null} onClick={() => { void createDomain() }}>
-                      {busy === 'create' ? t('creating') : t('create')}
-                    </button>
-                    <button type="button" className={styles.button} onClick={() => { setCreating(false) }}>{t('cancel')}</button>
-                  </div>
-                </div>
-              )
-              : (
-                <button type="button" className={styles.buttonPrimary} onClick={() => { setCreating(true) }}>{t('newDomain')}</button>
-              )}
+            <div className={styles.actions}>
+              <button type="button" className={styles.buttonPrimary} onClick={openCreate}>{t('newDomain')}</button>
+              <button type="button" className={styles.button} disabled={busy !== null} onClick={openImport}>
+                {t('importLabel')}
+              </button>
+            </div>
           </div>
         </section>
+      )}
+
+      {tab === 'analysis' && (
+        <AnalyticsPanel
+          store={store}
+          domain={activeDomain}
+          label={activeSummary?.label ?? activeDomain ?? ''}
+          t={t}
+        />
+      )}
+
+      {tab === 'audit' && (
+        <section className={styles.listBody}>
+          <AuditPanel entries={audit} t={t} />
+        </section>
+      )}
+
+      {createOpen && (
+        <div className={styles.overlay} role="presentation">
+          <div className={styles.mask} aria-hidden="true" onClick={closeCreate} />
+          <div className={styles.dialog} role="dialog" aria-modal="true" aria-label={t('newDomain')}>
+            <h2 className={styles.dialogTitle}>{t('newDomain')}</h2>
+            {createError !== null && (
+              <div className={styles.errorBanner} role="alert">
+                <span>{t('errorPrefix')}{createError}</span>
+              </div>
+            )}
+            <div className={styles.form}>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>{t('domainId')}</span>
+                <input className={styles.input} value={draftId} onChange={(event) => { setDraftId(event.target.value) }} />
+              </label>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>{t('domainLabel')}</span>
+                <input className={styles.input} value={draftLabel} onChange={(event) => { setDraftLabel(event.target.value) }} />
+              </label>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>{t('upload')}</span>
+                <input
+                  className={styles.fileInput}
+                  type="file"
+                  accept=".docx,.pdf,.md,.markdown,.txt"
+                  onChange={(event) => { void pickCreateFile(event.target.files?.[0]) }}
+                />
+              </label>
+              {createFileName.length > 0 && <p className={styles.fileName}>{createFileName}</p>}
+              <p className={styles.hint}>{t('uploadHint')}</p>
+              <p className={styles.hint}>{t('generateHint')}</p>
+            </div>
+            <div className={styles.dialogActions}>
+              <button type="button" className={styles.button} disabled={busy !== null} onClick={closeCreate}>
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                className={styles.button}
+                disabled={busy !== null || draftId.trim().length === 0}
+                onClick={() => { void submitCreate(false) }}
+              >
+                {busy === 'create' ? t('creating') : t('create')}
+              </button>
+              <button
+                type="button"
+                className={styles.buttonPrimary}
+                disabled={busy !== null || draftId.trim().length === 0 || createContentBase64.length === 0}
+                onClick={() => { void submitCreate(true) }}
+              >
+                {busy === 'create-generate' ? t('generating') : t('generate')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {importOpen && (
+        <div className={styles.overlay} role="presentation">
+          <div className={styles.mask} aria-hidden="true" onClick={closeImport} />
+          <div className={styles.dialog} role="dialog" aria-modal="true" aria-label={t('importLabel')}>
+            <h2 className={styles.dialogTitle}>{t('importLabel')}</h2>
+            {importError !== null && (
+              <div className={styles.errorBanner} role="alert">
+                <span>{t('errorPrefix')}{importError}</span>
+              </div>
+            )}
+            <div className={styles.form}>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>{t('domainId')}</span>
+                <input
+                  className={styles.input}
+                  value={importDomain}
+                  onChange={(event) => { setImportDomain(event.target.value) }}
+                />
+              </label>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>{t('importFile')}</span>
+                <input
+                  className={styles.fileInput}
+                  type="file"
+                  accept=".ttl,text/turtle"
+                  onChange={(event) => { void pickImportFile(event.target.files?.[0]) }}
+                />
+              </label>
+              {importFileName.length > 0 && <p className={styles.fileName}>{importFileName}</p>}
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>{t('importNote')}</span>
+                <input
+                  className={styles.input}
+                  value={importNote}
+                  onChange={(event) => { setImportNote(event.target.value) }}
+                />
+              </label>
+              <p className={styles.hint}>{t('importHint')}</p>
+            </div>
+            <div className={styles.dialogActions}>
+              <button type="button" className={styles.button} disabled={busy !== null} onClick={closeImport}>
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                className={styles.buttonPrimary}
+                disabled={busy !== null
+                  || importDomain.trim().length === 0
+                  || importNote.trim().length === 0
+                  || importText.length === 0}
+                onClick={() => { void submitImport() }}
+              >
+                {busy === 'import' ? t('importing') : t('importLabel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDelete !== null && (
+        <ConfirmDialog
+          title={t('deleteDomainTitle')}
+          message={`${pendingDelete.id} · ${t('deleteDomainHint')}`}
+          confirmLabel={t('confirmDelete')}
+          cancelLabel={t('cancel')}
+          busy={busy !== null}
+          onConfirm={() => { void confirmDeleteDomain() }}
+          onCancel={() => { if (busy === null) setPendingDelete(null) }}
+        />
       )}
 
       {tab === 'graph' && (
@@ -423,30 +855,82 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
                     </span>
                   </div>
                   <div className={styles.toolbarActions}>
-                    <input
-                      className={styles.fileInput}
-                      type="file"
-                      accept=".docx,.pdf,.md,.markdown,.txt"
-                      onChange={(event) => { void pickFile(event.target.files?.[0]) }}
-                    />
+                    <button type="button" className={styles.button} disabled={busy !== null} onClick={() => { void runValidation() }}>
+                      {busy === 'validate' ? t('validating') : t('validate')}
+                    </button>
                     <button
                       type="button"
-                      className={styles.buttonPrimary}
-                      disabled={busy !== null || contentBase64.length === 0}
-                      onClick={() => { void generate() }}
+                      className={styles.button}
+                      aria-expanded={patchOpen}
+                      onClick={() => { setPatchOpen(open => !open) }}
                     >
-                      {busy === 'generate' ? t('generating') : t('generate')}
+                      {t('patchLabel')}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.button}
+                      aria-expanded={qualityOpen}
+                      onClick={() => { setQualityOpen(open => !open) }}
+                    >
+                      {t('qualityLabel')}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.button}
+                      aria-expanded={sparqlOpen}
+                      onClick={() => { setSparqlOpen(open => !open) }}
+                    >
+                      {t('sparqlConsole')}
                     </button>
                     <button type="button" className={styles.button} onClick={() => { setTab('ontologies') }}>
                       {t('tabOntologies')}
                     </button>
+                    <button
+                      type="button"
+                      className={styles.button}
+                      aria-expanded={sideOpen}
+                      onClick={() => { setSideOpen(open => !open) }}
+                    >
+                      {sideOpen ? t('hideSidebar') : t('showSidebar')}
+                    </button>
                   </div>
                 </div>
-                {fileName.length > 0 && <p className={styles.fileName}>{fileName}</p>}
-                <p className={styles.hint}>{t('uploadHint')}</p>
                 <p className={styles.hint}>{t('graphHint')}</p>
 
-                <div className={styles.graphBody}>
+                {validation !== null && validationOpen && (
+                  <ValidationPanel
+                    report={validation}
+                    onClose={() => { setValidationOpen(false) }}
+                    t={t}
+                  />
+                )}
+
+                {sparqlOpen && (
+                  <SparqlConsole
+                    onRun={runSparql}
+                    onClose={() => { setSparqlOpen(false) }}
+                    t={t}
+                  />
+                )}
+
+                {patchOpen && (
+                  <PatchDialog
+                    onApply={applyPatch}
+                    onClose={() => { if (busy === null) setPatchOpen(false) }}
+                    busy={busy !== null}
+                    t={t}
+                  />
+                )}
+
+                {qualityOpen && (
+                  <QualityPanel
+                    onEvaluate={evaluate}
+                    onClose={() => { setQualityOpen(false) }}
+                    t={t}
+                  />
+                )}
+
+                <div className={`${styles.graphBody}${sideOpen ? '' : ` ${styles.graphBodyCollapsed}`}`}>
                   <main className={styles.main}>
                     {graph === null || graph.nodes.length === 0
                       ? <p className={styles.hint}>{t('graphEmpty')}</p>
@@ -457,58 +941,49 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
                             graph={graph}
                             selectedId={selectedId}
                             onSelect={setSelectedId}
+                            t={t}
                           />
                         </div>
                       )}
 
-                    {(steps.length > 0 || warnings.length > 0) && (
+                    {warnings.length > 0 && (
                       <div className={styles.log}>
-                        {steps.length > 0 && (
-                          <>
-                            <h4 className={styles.sectionTitle}>{t('steps')}</h4>
-                            <ul className={styles.stepList}>
-                              {steps.map((step, index) => (
-                                <li key={`${step.stage}-${index}`} className={styles.step}>
-                                  <span className={styles.stepGlyph}>{stepGlyph(step.status)}</span>
-                                  <span>{step.message}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </>
-                        )}
-                        {warnings.length > 0 && (
-                          <>
-                            <h4 className={styles.sectionTitle}>{t('warnings')}</h4>
-                            <ul className={styles.stepList}>
-                              {warnings.map((warning, index) => (
-                                <li key={`warn-${index}`} className={styles.step}>{warning}</li>
-                              ))}
-                            </ul>
-                          </>
-                        )}
+                        <h4 className={styles.sectionTitle}>{t('warnings')}</h4>
+                        <ul className={styles.stepList}>
+                          {warnings.map((warning, index) => (
+                            <li key={`warn-${index}`} className={styles.step}>{warning}</li>
+                          ))}
+                        </ul>
                       </div>
                     )}
                   </main>
 
-                  <div className={styles.side}>
-                    <Inspector
-                      key={`inspector:${selectedId ?? 'none'}`}
-                      graph={graph ?? { domain: '', label: '', namespace: '', version: null, nodes: [], edges: [], turtle: '' }}
-                      selectedId={selectedId}
-                      busy={busy !== null}
-                      t={t}
-                      onApply={(edits) => { void applyEdits(edits) }}
-                    />
-                    <VersionsPanel
-                      key={`versions:${versionsSignature}`}
-                      versions={versions}
-                      diff={diff}
-                      busyVersion={busy !== null && busy.startsWith('activate:') ? busy.slice('activate:'.length) : null}
-                      t={t}
-                      onActivate={(version) => { void activate(version) }}
-                      onCompare={(from, to) => { void compare(from, to) }}
-                    />
-                  </div>
+                  {sideOpen && (
+                    <div className={styles.side}>
+                      <Inspector
+                        key={`inspector:${selectedId ?? 'none'}`}
+                        graph={graph ?? { domain: '', label: '', namespace: '', version: null, nodes: [], edges: [], turtle: '' }}
+                        selectedId={selectedId}
+                        busy={busy !== null}
+                        t={t}
+                        onApply={(edits) => { void applyEdits(edits) }}
+                      />
+                      <VersionsPanel
+                        key={`versions:${versionsSignature}`}
+                        versions={versions}
+                        diff={diff}
+                        busyVersion={busy !== null && (busy.startsWith('publish:') || busy.startsWith('submit-review:'))
+                          ? busy.slice(busy.indexOf(':') + 1)
+                          : null}
+                        deletingVersion={busy !== null && busy.startsWith('delete-version:') ? busy.slice('delete-version:'.length) : null}
+                        t={t}
+                        onPublish={(version) => { void publish(version) }}
+                        onSubmitReview={(version) => { void submitReview(version) }}
+                        onCompare={(from, to) => { void compare(from, to) }}
+                        onDelete={(version, force) => { void removeVersion(version, force) }}
+                      />
+                    </div>
+                  )}
                 </div>
               </>
             )}

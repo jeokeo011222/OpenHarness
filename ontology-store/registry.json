@@ -1,3 +1,7 @@
 {
-  "domains": ["contract", "procurement"]
+  "domains": [
+    "contract",
+    "procurement",
+    "pilot-procurement"
+  ]
 }

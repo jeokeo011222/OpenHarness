@@ -3,14 +3,12 @@
  * Publish a candidate Turtle ontology as a new semver version.
  *
  * Execution steps:
- *   1. Verify candidate file exists
+ *   1. Verify candidate file exists and the domain is registered
  *   2. Run pySHACL against the current shapes.ttl — block if fails
- *   3. Create versions/{version}/ directory
- *   4. Copy candidate.ttl → versions/{version}/ontology.ttl
- *   5. Copy shapes.ttl → versions/{version}/shapes.ttl
- *   6. Replace live ontology.ttl with the candidate (keeping shapes.ttl)
- *   7. Regenerate summary.md via generateSummary()
- *   8. Print a diff-like change summary
+ *   3. Write the version snapshot graph + version record into graph.db.nq
+ *   4. Replace the domain's live graph with the candidate
+ *   5. Set activeVersion/updatedAt and refresh the summary cache
+ *   6. Print a diff-like change summary
  *
  * Usage:
  *   pnpm exec tsx ontology-store/scripts/publish-ontology.ts \
@@ -18,14 +16,29 @@
  *     --candidate candidates/contract-20261029.ttl \
  *     --version 1.1.0
  *
- * Exits non-zero if the candidate fails SHACL or any file is missing.
+ * Exits non-zero if the candidate fails SHACL or any input is missing.
  */
 
-import { readFile, writeFile, copyFile, mkdir, stat } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { readFile } from 'node:fs/promises'
+import { join, resolve, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { argv } from 'node:process'
+import {
+  domainExists,
+  listVersions,
+  readDomainMeta,
+  readLiveTurtle,
+  requireDomainId,
+  writeDomainMeta,
+  writeLiveTurtle,
+  writeSummaryCache,
+  writeVersion,
+} from '../../packages/context/ontology-injector/src/store.ts'
+import { generateSummary } from '../../packages/context/ontology-injector/src/summary.ts'
+
+const __dirname = resolve(fileURLToPath(import.meta.url), '..')
 
 // --- Argument parsing ---
 
@@ -84,7 +97,7 @@ function shaclValidate(candidateTtlPath: string, shapesTtlPath: string): Promise
   })
 }
 
-// --- Change summary (naive line diff vs previous ontology.ttl) ---
+// --- Change summary (naive line diff vs the previous live graph) ---
 
 interface ChangeSummary {
   added: string[]
@@ -102,7 +115,7 @@ function diffOntologies(old: string, neo: string): ChangeSummary {
     if (!oldLines.has(line)) added.push(line)
   }
   for (const line of oldLines) {
-    if (!newLines.has(line)) removed.push(line)
+    if (!newLines.includes(line)) removed.push(line)
   }
   return {
     added,
@@ -117,24 +130,31 @@ function diffOntologies(old: string, neo: string): ChangeSummary {
 async function main(): Promise<void> {
   const args = parseArgs(argv.slice(2))
   const storeRoot = resolve(__dirname, '..')
-  const domainDir = join(storeRoot, args.domain)
   const candidatePath = resolve(args.candidate)
-  const shapesPath = join(domainDir, 'shapes.ttl')
-  const currentOntologyPath = join(domainDir, 'ontology.ttl')
-  const versionsDir = join(domainDir, 'versions')
-  const versionDir = join(versionsDir, args.version)
+  const shapesPath = join(join(storeRoot, args.domain), 'shapes.ttl')
 
   // 1. Validate inputs
   if (!existsSync(candidatePath)) {
     console.error(`Candidate not found: ${candidatePath}`)
     process.exit(1)
   }
+  try {
+    requireDomainId(args.domain)
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exit(1)
+  }
   if (!existsSync(shapesPath)) {
     console.error(`shapes.ttl not found at ${shapesPath}`)
     process.exit(1)
   }
-  if (existsSync(versionDir)) {
-    console.error(`Version directory already exists: ${versionDir}`)
+  if (!await domainExists(storeRoot, args.domain)) {
+    console.error(`Domain not found in the ontology store: ${args.domain}`)
+    process.exit(1)
+  }
+  const stored = await listVersions(storeRoot, args.domain)
+  if (stored.some(record => record.version === args.version)) {
+    console.error(`Version already exists: ${args.domain}@${args.version}`)
     process.exit(1)
   }
 
@@ -148,33 +168,38 @@ async function main(): Promise<void> {
   }
   console.log('✅ SHACL conforms')
 
-  // 3. Create version dir
-  await mkdir(versionDir, { recursive: true })
+  // 3. Write the immutable version snapshot
+  const turtle = await readFile(candidatePath, 'utf8')
+  const previous = await readLiveTurtle(storeRoot, args.domain)
+  const meta = await readDomainMeta(storeRoot, args.domain)
+  const now = new Date().toISOString()
+  await writeVersion(storeRoot, args.domain, turtle, {
+    version: args.version,
+    createdAt: now,
+    approver: 'cli',
+    note: `Published from ${relative(storeRoot, candidatePath)}`,
+    sourceName: relative(storeRoot, candidatePath),
+  })
+  console.log(`📁 Version ${args.version} snapshot written to the ontology store`)
 
-  // 4. Copy candidate + shapes into version dir
-  await copyFile(candidatePath, join(versionDir, 'ontology.ttl'))
-  await copyFile(shapesPath, join(versionDir, 'shapes.ttl'))
-  console.log(`📁 Version ${args.version} snapshot written to ${versionDir}`)
+  // 4. Replace the live graph and activate the version
+  await writeLiveTurtle(storeRoot, args.domain, turtle)
+  await writeDomainMeta(storeRoot, {
+    id: args.domain,
+    label: meta.label,
+    createdAt: meta.createdAt || now,
+    updatedAt: now,
+    activeVersion: args.version,
+    disabled: meta.disabled,
+  })
+  console.log(`🔄 Live graph replaced`)
 
-  // 5. Read old ontology (for diff), then replace live ontology.ttl
-  const oldOntology = existsSync(currentOntologyPath)
-    ? await readFile(currentOntologyPath, 'utf8')
-    : ''
-  await copyFile(candidatePath, currentOntologyPath)
-  console.log(`🔄 Live ontology.ttl replaced`)
+  // 5. Refresh the summary cache
+  await writeSummaryCache(storeRoot, args.domain, { stamp: now, text: generateSummary(args.domain, turtle) })
+  console.log(`📝 Summary cache refreshed`)
 
-  // 6. Regenerate summary.md
-  const summaryTurtle = await readFile(currentOntologyPath, 'utf8')
-  // Use the same generateSummary from the injector — re-import via lib path
-  // For CLI simplicity, inline the summary generation by calling the module
-  const { generateSummary } = await import(
-    join(storeRoot, '..', 'packages/context/ontology-injector/lib/types/summary.js')
-  )
-  await generateSummary(storeRoot, args.domain, summaryTurtle)
-  console.log(`📝 summary.md regenerated`)
-
-  // 7. Diff summary
-  const summary = diffOntologies(oldOntology, summaryTurtle)
+  // 6. Diff summary
+  const summary = diffOntologies(previous, turtle)
   console.log('\n=== Publication Summary ===')
   console.log(`Domain:   ${args.domain}`)
   console.log(`Version:  ${args.version}`)
@@ -189,7 +214,7 @@ async function main(): Promise<void> {
     for (const line of summary.removed.slice(0, 10)) console.log(`  - ${line.slice(0, 100)}`)
   }
   console.log('\n✅ Publication complete.')
-  console.log(`Previous versions preserved under ${versionsDir}`)
+  console.log(`Previous versions preserved in the ontology store`)
 }
 
 await main()

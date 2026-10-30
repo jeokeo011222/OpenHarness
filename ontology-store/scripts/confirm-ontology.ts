@@ -2,20 +2,19 @@
 /**
  * Confirm and promote an ontology candidate to a new version.
  *
- * NEVER skips confirmation. NEVER writes to versions/ without:
+ * NEVER skips confirmation. NEVER writes a version snapshot without:
  *   1. A fresh SHACL pass over the candidate file
  *   2. A non-empty --approver
  *
  * Execution steps:
  *   1. Read the candidate .ttl
  *   2. Re-run pySHACL (must pass; fails = stop here, no mutation)
- *   3. Determine next version (default: bump last versions/* semver patch)
- *   4. Snapshot {candidate, shapes.ttl, summary.md} into versions/{version}/
- *   5. Replace live {domain}/ontology.ttl with candidate
- *   6. Regenerate summary.md via @deepseek-ai/dsh-ontology-injector's module
- *   7. Append confirmation entry to candidates.json (status → confirmed, approver, timestamp)
- *   8. Write confirmation metadata (approver, note, timestamp, git hash) into versions/{version}/.confirm.json
- *   9. Print a diff summary vs previous version
+ *   3. Determine next version (default: patch bump over the stored version records)
+ *   4. Write the version snapshot graph + version record into graph.db.nq
+ *   5. Replace the domain's live graph with the candidate
+ *   6. Set activeVersion/updatedAt and refresh the summary cache
+ *   7. Append the confirmation entry to candidates.json (status → confirmed)
+ *   8. Print a diff summary vs the previous live graph
  *
  * Usage:
  *   pnpm exec tsx ontology-store/scripts/confirm-ontology.ts \
@@ -27,12 +26,27 @@
  * Env vars: none required
  */
 
-import { readFile, writeFile, copyFile, mkdir, stat } from 'node:fs/promises'
-import { join, resolve, dirname, relative } from 'node:path'
-import { existsSync, readdirSync } from 'node:fs'
+import { readFile, writeFile } from 'node:fs/promises'
+import { join, resolve, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { argv } from 'node:process'
-import { execSync } from 'node:child_process'
+import {
+  domainExists,
+  listVersions,
+  nextVersion,
+  readDomainMeta,
+  readLiveTurtle,
+  requireDomainId,
+  writeDomainMeta,
+  writeLiveTurtle,
+  writeSummaryCache,
+  writeVersion,
+} from '../../packages/context/ontology-injector/src/store.ts'
+import { generateSummary } from '../../packages/context/ontology-injector/src/summary.ts'
+
+const __dirname = resolve(fileURLToPath(import.meta.url), '..')
 
 // --- Arg parsing ---
 
@@ -86,30 +100,6 @@ function parseSemver(v: string): { major: number; minor: number; patch: number }
   return { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3]) }
 }
 
-function bumpPatch(v: string): string {
-  const p = parseSemver(v)
-  if (!p) return v + '-1'
-  return `${p.major}.${p.minor}.${p.patch + 1}`
-}
-
-function autoBump(versionsDir: string): string {
-  if (!existsSync(versionsDir)) return '1.0.0'
-  const dirs = readdirSync(versionsDir).filter(d => parseSemver(d))
-  if (dirs.length === 0) return '1.0.0'
-  dirs.sort((a, b) => {
-    const pa = parseSemver(a)!
-    const pb = parseSemver(b)!
-    return (pb.major - pa.major) || (pb.minor - pa.minor) || (pb.patch - pa.patch)
-  })
-  return bumpPatch(dirs[0])
-}
-
-// --- Git hash ---
-
-function tryGitHash(cwd: string): string {
-  try { return execSync('git rev-parse HEAD', { cwd, encoding: 'utf8' }).trim().slice(0, 8) } catch { return 'n/a' }
-}
-
 // --- Main ---
 
 async function main(): Promise<void> {
@@ -121,13 +111,17 @@ async function main(): Promise<void> {
   const domain = candidateName.split('-')[0]
   const domainDir = join(storeRoot, domain)
   const shapesPath = join(domainDir, 'shapes.ttl')
-  const liveOntologyPath = join(domainDir, 'ontology.ttl')
-  const versionsDir = join(domainDir, 'versions')
   const candidatesDir = join(storeRoot, 'candidates')
 
   // === Pre-conditions ===
   if (!existsSync(candidatePath)) { console.error(`Candidate not found: ${candidatePath}`); process.exit(1) }
-  if (!existsSync(domainDir)) { console.error(`Domain dir not found: ${domainDir}`); process.exit(1) }
+  try {
+    requireDomainId(domain)
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exit(1)
+  }
+  if (!await domainExists(storeRoot, domain)) { console.error(`Domain not found in the ontology store: ${domain}`); process.exit(1) }
   if (!existsSync(shapesPath)) { console.error(`shapes.ttl not found at ${shapesPath}. Cannot confirm without SHACL.`); process.exit(1) }
 
   // === 1. Re-verify SHACL (fresh pass, no cache) ===
@@ -142,63 +136,53 @@ async function main(): Promise<void> {
   console.log(' PASSED')
 
   // === 2. Determine version ===
+  const stored = await listVersions(storeRoot, domain)
   let version = args.version
   if (!version) {
-    version = autoBump(versionsDir)
+    version = nextVersion(stored.map(record => record.version))
     process.stdout.write(`[2/6] Auto-detected next version: ${version}...`)
   } else {
     if (!parseSemver(version)) { console.error(`Invalid semver: ${version}`); process.exit(1) }
     process.stdout.write(`[2/6] Using explicit version: ${version}...`)
   }
-  const versionDir = join(versionsDir, version)
-  if (existsSync(versionDir)) { console.error(`Version ${version} already exists. Cannot overwrite.`); process.exit(1) }
+  if (stored.some(record => record.version === version)) {
+    console.error(`Version ${version} already exists. Cannot overwrite.`)
+    process.exit(1)
+  }
   console.log(' OK')
 
-  // === 3. Snapshot current live ontology ===
-  await mkdir(versionDir, { recursive: true })
-  await copyFile(candidatePath, join(versionDir, 'ontology.ttl'))
-  if (existsSync(shapesPath)) await copyFile(shapesPath, join(versionDir, 'shapes.ttl'))
-  if (existsSync(join(domainDir, 'summary.md'))) {
-    await copyFile(join(domainDir, 'summary.md'), join(versionDir, 'summary.md'))
-  }
-  console.log(`[3/6] Snapshot → ${relative(storeRoot, versionDir)}/`)
-
-  // === 4. Replace live ontology.ttl ===
-  if (existsSync(liveOntologyPath)) {
-    await copyFile(liveOntologyPath, join(versionDir, 'ontology.prev.ttl'))
-  }
-  await copyFile(candidatePath, liveOntologyPath)
-  console.log(`[4/6] Live ontology.ttl replaced`)
-
-  // === 5. Regenerate summary.md (reuse injector's module) ===
-  process.stdout.write(`[5/6] Regenerating summary.md...`)
-  const turtle = await readFile(liveOntologyPath, 'utf8')
-  try {
-    const { generateSummary } = await import('@deepseek-ai/dsh-ontology-injector/src/summary.ts')
-    await generateSummary(storeRoot, domain, turtle)
-    console.log(' OK')
-  } catch (err) {
-    console.log(` fallback (inline)`)
-    // Inline fallback: just write a header so summary.md exists
-    const summaryPath = join(domainDir, 'summary.md')
-    await writeFile(summaryPath, `## 当前业务域：${domain}\n\n（自动生成失败，需手动重建）\n`, 'utf8')
-  }
-
-  // === 6. Write confirmation metadata ===
+  // === 3. Snapshot the candidate as an immutable version ===
+  const turtle = await readFile(candidatePath, 'utf8')
+  const previous = await readLiveTurtle(storeRoot, domain)
+  const meta = await readDomainMeta(storeRoot, domain)
   const now = new Date().toISOString()
-  const confirmEntry = {
-    approver: args.approver,
-    note: args.note || '',
-    confirmedAt: now,
+  await writeVersion(storeRoot, domain, turtle, {
     version,
-    candidate: relative(storeRoot, candidatePath),
-    shaclConforms: true,
-    shaclReportPath: relative(storeRoot, join(candidatesDir, `${candidateName}-report.md`)),
-    gitHash: tryGitHash(storeRoot),
-  }
-  await writeFile(join(versionDir, '.confirm.json'), JSON.stringify(confirmEntry, null, 2), 'utf8')
+    createdAt: now,
+    approver: args.approver,
+    note: args.note,
+    sourceName: relative(storeRoot, candidatePath),
+  })
+  console.log(`[3/6] Snapshot → ${domain}@${version}`)
 
-  // Update candidates.json
+  // === 4. Replace the live graph ===
+  await writeLiveTurtle(storeRoot, domain, turtle)
+  await writeDomainMeta(storeRoot, {
+    id: domain,
+    label: meta.label,
+    createdAt: meta.createdAt || now,
+    updatedAt: now,
+    activeVersion: version,
+    disabled: meta.disabled,
+  })
+  console.log(`[4/6] Live graph replaced`)
+
+  // === 5. Refresh the summary cache ===
+  process.stdout.write(`[5/6] Refreshing summary cache...`)
+  await writeSummaryCache(storeRoot, domain, { stamp: now, text: generateSummary(domain, turtle) })
+  console.log(' OK')
+
+  // === 6. Update candidates.json ===
   const indexPath = join(candidatesDir, 'candidates.json')
   if (existsSync(indexPath)) {
     const index = JSON.parse(await readFile(indexPath, 'utf8')) as Array<Record<string, unknown>>
@@ -212,19 +196,17 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log(`[6/6] Confirmation recorded → .confirm.json`)
+  console.log(`[6/6] Confirmation recorded → candidates.json`)
 
   // === Diff summary ===
   let diffLines = 0, addedClasses = 0, removedClasses = 0
-  const prevPath = join(versionDir, 'ontology.prev.ttl')
-  if (existsSync(prevPath)) {
-    const prev = await readFile(prevPath, 'utf8')
-    const prevClasses = new Set([...prev.matchAll(/([\w:]+)\s+a\s+owl:Class/g)].map(m => m[1]))
+  if (previous.trim().length > 0) {
+    const prevClasses = new Set([...previous.matchAll(/([\w:]+)\s+a\s+owl:Class/g)].map(m => m[1]))
     const newClasses = [...turtle.matchAll(/([\w:]+)\s+a\s+owl:Class/g)].map(m => m[1])
     const prevClassArr = [...prevClasses]
     for (const c of newClasses) if (!prevClasses.has(c)) addedClasses += 1
     for (const c of prevClassArr) if (!newClasses.includes(c)) removedClasses += 1
-    const prevLines = new Set(prev.split('\n').filter(l => l.trim()))
+    const prevLines = new Set(previous.split('\n').filter(l => l.trim()))
     for (const line of turtle.split('\n').filter(l => l.trim())) {
       if (!prevLines.has(line)) diffLines += 1
     }
@@ -237,16 +219,16 @@ async function main(): Promise<void> {
   console.log(`  Approver:    ${args.approver}`)
   console.log(`  Version:     ${version}`)
   console.log(`  Domain:      ${domain}`)
-  console.log(`  Snapshot:    ${relative(storeRoot, versionDir)}/`)
+  console.log(`  Snapshot:    ${domain}@${version} (version graph)`)
   console.log(`  SHACL:       ✅ PASSED (二次校验)`)
-  if (existsSync(prevPath)) {
+  if (previous.trim().length > 0) {
     console.log(`  +新增行:     ${diffLines}`)
     console.log(`  新增类:      ${addedClasses}`)
     console.log(`  移除类:      ${removedClasses}`)
   }
   if (args.note) console.log(`  Note:        ${args.note}`)
   console.log('')
-  console.log('  所有历史版本保留在 versions/ 目录中，')
+  console.log('  所有历史版本保留在 graph.db.nq 的版本图中，')
   console.log('  不支持无 approver 的直接发布。')
 }
 

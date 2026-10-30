@@ -1,0 +1,76 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/context/ontology-injector/README.md
+/:
+  en: bdb9b458dd084edf
+  zh: a6b1b14944273fb3
+/deepseek-ai-dsh-ontology-injector:
+  en: 1d809e641584a446
+  zh: b0021db88ecf12b1
+/deepseek-ai-dsh-ontology-injector/summary:
+  en: b36ec2057f52de29
+  zh: b364b8a954c8f243
+/deepseek-ai-dsh-ontology-injector/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-ontology-injector/use-this-package:
+  en: c91ecb49a0f74c47
+  zh: b80e265c36492217
+/deepseek-ai-dsh-ontology-injector/use-this-package/what-the-model-gets:
+  en: c4d5ec098bc2c5e4
+  zh: fcd5884a430e97b0
+/deepseek-ai-dsh-ontology-injector/use-this-package/configuration:
+  en: fd1d877970c47382
+  zh: 6af19bcafa19c74d
+/deepseek-ai-dsh-ontology-injector/use-this-package/storage-layout:
+  en: 6cb80e1cbc43cb40
+  zh: 49c1c5e71b5002e6
+/deepseek-ai-dsh-ontology-injector/use-this-package/the-workbench:
+  en: ea267f791cd7cfb2
+  zh: 1e25115216aeaf00
+/deepseek-ai-dsh-ontology-injector/use-this-package/analytics:
+  en: d234417955061f85
+  zh: 5c6dbd234b6e4003
+/deepseek-ai-dsh-ontology-injector/use-this-package/operator-commands:
+  en: 0195ca35dacfe7d7
+  zh: f81f7b782b6f889b
+/deepseek-ai-dsh-ontology-injector/understand-the-implementation:
+  en: 2d21fa2aad5a729d
+  zh: cfbfada0eb647435
+/deepseek-ai-dsh-ontology-injector/understand-the-implementation/design-concept:
+  en: 72254e9a6eaee571
+  zh: 33ffae9aa30e075e
+/deepseek-ai-dsh-ontology-injector/understand-the-implementation/source-map:
+  en: 870991984d92095a
+  zh: 5434267a09a48a7c
+/deepseek-ai-dsh-ontology-injector/understand-the-implementation/main-flow:
+  en: 5bc4851280bf07a2
+  zh: bde634b6959de137
+/deepseek-ai-dsh-ontology-injector/further-exploration:
+  en: f5bcfe3f15a34cab
+  zh: c31385595af404a3
+/deepseek-ai-dsh-ontology-injector/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-ontology-injector/model-experience/per-turn-ontology-summary:
+  en: cf6b823e06bd2fb0
+  zh: abd34c5f562221e4
+/deepseek-ai-dsh-ontology-injector/model-experience/per-turn-ontology-summary/what-the-model-sees:
+  en: 87e6ef0d0bf4362e
+  zh: 465f1ac5353f65e7
+/deepseek-ai-dsh-ontology-injector/model-experience/per-turn-ontology-summary/what-the-model-sees/injected-message:
+  en: c665166b8d6a4c67
+  zh: c21996b4f9215138
+/deepseek-ai-dsh-ontology-injector/model-experience/per-turn-ontology-summary/token-effect:
+  en: 092bd0574f15a573
+  zh: dad50d866243a07d
+/deepseek-ai-dsh-ontology-injector/model-experience/per-turn-ontology-summary/kv-cache-effect:
+  en: 32fc559dcbba267c
+  zh: a1ba08c31cb7fa24
+/deepseek-ai-dsh-ontology-injector/known-limitations-and-deferred-work:
+  en: f79a4a8c6fa22d56
+  zh: dcdaa7e8d8c97bfc
+/deepseek-ai-dsh-ontology-injector/known-limitations-and-deferred-work/dev-note:
+  en: 6872162ed386a108
+  zh: f00d7f72dfc92ff2
