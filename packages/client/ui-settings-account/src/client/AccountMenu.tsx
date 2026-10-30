@@ -1,7 +1,7 @@
 /** Sidebar account launcher and locally authoritative sign-out action. */
 import { useEffect, useRef, useState } from 'react'
 import {
-  Toast, Menu, IconEllipsisOutlineMedium, IconPaperPlaneOutlineMedium, IconSettingsOutlineMedium, IconUserOutlineMedium,
+  Toast, Menu, IconEllipsisOutlineMedium, IconPaperPlaneOutlineMedium, IconSettingsOutlineMedium, IconShieldOutlineMedium, IconUserOutlineMedium,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { AccountSectionInjected } from './AccountSection.tsx'
@@ -10,6 +10,7 @@ import { SignInDialog } from './SignInDialog.tsx'
 import { LogoutIcon } from './LogoutIcon.tsx'
 import { AccountAvatar } from './AccountAvatar.tsx'
 import { AccountNoticeStack } from './AccountNotice.tsx'
+import { fetchLocalAdmin } from './local-admin.ts'
 import css from './AccountMenu.module.css'
 
 /** Account launcher composed by the settings shell. */
@@ -43,6 +44,14 @@ export function AccountMenu({
   const label = profile === undefined ? null : profile.status === 'ready'
     ? profile.value.name ?? profile.value.contact ?? t('signedIn') : t('signedIn')
   const [open, setOpen] = useState(false)
+  // The local account-directory session is browser-only state, so one probe per mount
+  // decides the admin-console entry; failures leave the menu unchanged.
+  const [localAdmin, setLocalAdmin] = useState(false)
+  useEffect(() => {
+    let live = true
+    void fetchLocalAdmin().then(value => { if (live) setLocalAdmin(value) })
+    return () => { live = false }
+  }, [])
   const trigger = useRef<HTMLButtonElement>(null)
   const [busy, setBusy] = useState(false)
   const [signOutImpact, setSignOutImpact] = useState<boolean | 'unknown'>()
@@ -75,6 +84,7 @@ export function AccountMenu({
         { id: 'settings', label: t('settings'), icon: <IconSettingsOutlineMedium size={16} />,
           ...(settingsShortcut === undefined ? {} : { shortcut: settingsShortcut }) },
         { id: 'contact', label: t('contactUs'), icon: <IconPaperPlaneOutlineMedium size={16} /> },
+        ...(localAdmin ? [{ id: 'admin', label: t('userManagement'), icon: <IconShieldOutlineMedium size={16} /> }] : []),
         ...(signedIn ? [{ id: 'signout', label: t('signOut'), icon: <LogoutIcon />, disabled: busy }]
           : [{ id: 'signin', label: t('signIn'), icon: <IconUserOutlineMedium size={16} /> }]),
       ]}
@@ -82,6 +92,7 @@ export function AccountMenu({
       onSelect={(id) => {
         if (id === 'settings') { setOpen(false); trigger.current?.focus(); openSettings() }
         else if (id === 'contact') { setOpen(false); contactUs() }
+        else if (id === 'admin') { setOpen(false); window.open('/admin', '_blank', 'noopener') }
         else if (id === 'signin') beginSignIn()
         else void requestSignOut()
       }} />
