@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 460" width="1180" height="460" role="img" aria-label="Local account sign-in and admin workbench flow">
+  <rect width="1180" height="460" fill="#ffffff"/>
+  <text x="40" y="44" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="22" font-weight="700" fill="#0f172a">Local accounts and the admin workbench</text>
+  <text x="40" y="70" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" fill="#475569">Every browser request needs a signed-in local account; administrators reach every resource and the user-management panel.</text>
+
+  <rect x="40" y="120" width="170" height="76" rx="10" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="125" y="150" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#1e3a8a">Browser</text>
+  <text x="125" y="172" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">http://127.0.0.1:3080</text>
+
+  <path d="M220 158 L254 158" stroke="#94a3b8" stroke-width="2"/>
+  <path d="M246 152 L256 158 L246 164" fill="#94a3b8"/>
+
+  <rect x="260" y="120" width="220" height="76" rx="10" fill="#f5f3ff" stroke="#ddd6fe"/>
+  <text x="370" y="146" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#4c1d95">Session gate</text>
+  <text x="370" y="168" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">every index request is decided</text>
+
+  <path d="M490 158 L524 158" stroke="#94a3b8" stroke-width="2"/>
+  <path d="M516 152 L526 158 L516 164" fill="#94a3b8"/>
+
+  <rect x="530" y="120" width="230" height="76" rx="10" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text x="645" y="146" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#065f46">Signed-in session</text>
+  <text x="645" y="168" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">app index, sidebar, tool cards</text>
+
+  <path d="M370 204 L370 248" stroke="#f59e0b" stroke-width="2"/>
+  <path d="M364 240 L370 250 L376 240" fill="#f59e0b"/>
+  <rect x="260" y="256" width="220" height="76" rx="10" fill="#fffbeb" stroke="#fde68a"/>
+  <text x="370" y="282" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#92400e">303 to /login</text>
+  <text x="370" y="304" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#78350f">local form: /auth/login, /auth/register</text>
+
+  <path d="M770 158 L804 158" stroke="#94a3b8" stroke-width="2"/>
+  <path d="M796 152 L806 158 L796 164" fill="#94a3b8"/>
+
+  <rect x="810" y="120" width="150" height="76" rx="10" fill="#f5f3ff" stroke="#ddd6fe"/>
+  <text x="885" y="146" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#4c1d95">Role check</text>
+  <text x="885" y="168" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">admin or member</text>
+
+  <path d="M970 158 L1004 158" stroke="#94a3b8" stroke-width="2"/>
+  <path d="M996 152 L1006 158 L996 164" fill="#94a3b8"/>
+
+  <rect x="1010" y="120" width="130" height="76" rx="10" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text x="1075" y="146" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#065f46">Full access</text>
+  <text x="1075" y="168" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">remote policy allows all</text>
+
+  <path d="M885 204 L885 250 L610 250 L610 288" stroke="#94a3b8" stroke-width="2" fill="none"/>
+  <path d="M604 282 L610 292 L616 282" fill="#94a3b8"/>
+
+  <rect x="500" y="296" width="640" height="104" rx="10" fill="#0f172a"/>
+  <text x="522" y="326" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="15" font-weight="600" fill="#f8fafc">account-directory</text>
+  <text x="522" y="350" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#cbd5e1">SQLite accounts and resource grants, signed session cookies</text>
+  <text x="522" y="370" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#cbd5e1">/auth/state roster · /admin/state workbench · /admin account and grant form routes</text>
+  <text x="522" y="390" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#94a3b8">The sidebar shows the user-management panel only for administrators.</text>
+
+  <path d="M500 308 L488 308 L488 226 L370 226 L370 204" stroke="#94a3b8" stroke-width="2" fill="none"/>
+  <path d="M364 212 L370 202 L376 212" fill="#94a3b8"/>
+
+  <text x="40" y="430" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#64748b">Accounts are created, renamed, demoted and deleted in the panel; grants pair an account with a workspace or session resource and its roles.</text>
+</svg>

@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 640" width="1180" height="640" role="img" aria-label="OpenHarness architecture: frontends, harness core, and plugin seams">
+  <rect width="1180" height="640" fill="#ffffff"/>
+  <text x="590" y="46" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="24" font-weight="700" fill="#0f172a">OpenHarness architecture</text>
+  <text x="590" y="74" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" fill="#475569">Clients talk to one harness core; every capability hangs off a plugin seam.</text>
+
+  <text x="40" y="118" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" font-weight="700" fill="#2563eb" letter-spacing="1">FRONTENDS</text>
+  <text x="440" y="118" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" font-weight="700" fill="#7c3aed" letter-spacing="1">HARNESS CORE</text>
+  <text x="840" y="118" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" font-weight="700" fill="#059669" letter-spacing="1">CAPABILITY SEAMS</text>
+
+  <rect x="40" y="132" width="340" height="96" rx="10" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="62" y="164" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="16" font-weight="600" fill="#1e3a8a">Web client (Vite + React)</text>
+  <text x="62" y="190" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" fill="#334155">127.0.0.1:3080, sidebar panels, tool cards</text>
+
+  <rect x="40" y="240" width="340" height="96" rx="10" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="62" y="272" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="16" font-weight="600" fill="#1e3a8a">Desktop client (Electron)</text>
+  <text x="62" y="298" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" fill="#334155">Same client packages, native window shell</text>
+
+  <rect x="40" y="356" width="340" height="86" rx="10" fill="#fffbeb" stroke="#fde68a"/>
+  <text x="62" y="386" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="15" font-weight="600" fill="#92400e">Local account gate</text>
+  <text x="62" y="410" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" fill="#78350f">No session: 303 to /login</text>
+
+  <path d="M392 300 L432 300" stroke="#94a3b8" stroke-width="2"/>
+  <path d="M424 294 L434 300 L424 306" fill="#94a3b8"/>
+
+  <rect x="440" y="132" width="340" height="120" rx="10" fill="#f5f3ff" stroke="#ddd6fe"/>
+  <text x="462" y="164" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="16" font-weight="600" fill="#4c1d95">Webserver and API</text>
+  <text x="462" y="190" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" fill="#334155">Index injection, client module graph,</text>
+  <text x="462" y="210" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" fill="#334155">/auth and /admin routes, remote BFF</text>
+
+  <rect x="440" y="268" width="340" height="120" rx="10" fill="#f5f3ff" stroke="#ddd6fe"/>
+  <text x="462" y="300" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="16" font-weight="600" fill="#4c1d95">Agent loop</text>
+  <text x="462" y="326" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" fill="#334155">Model requests, tool calls, compaction</text>
+  <text x="462" y="346" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" fill="#334155">Extension points: slots, waterfalls</text>
+
+  <rect x="440" y="404" width="340" height="86" rx="10" fill="#f5f3ff" stroke="#ddd6fe"/>
+  <text x="462" y="434" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="16" font-weight="600" fill="#4c1d95">Session log</text>
+  <text x="462" y="458" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" fill="#334155">Every model-visible input is reconstructable</text>
+
+  <path d="M792 300 L832 300" stroke="#94a3b8" stroke-width="2"/>
+  <path d="M824 294 L834 300 L824 306" fill="#94a3b8"/>
+
+  <rect x="840" y="132" width="300" height="52" rx="8" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text x="856" y="164" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" fill="#065f46">shell, subprocess, ssh, terminal</text>
+
+  <rect x="840" y="194" width="300" height="52" rx="8" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text x="856" y="226" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" fill="#065f46">fs, web, browser-use, computer-use</text>
+
+  <rect x="840" y="256" width="300" height="52" rx="8" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text x="856" y="288" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" fill="#065f46">subagent, jobs, mcp, guard</text>
+
+  <rect x="840" y="318" width="300" height="52" rx="8" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text x="856" y="350" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" fill="#065f46">ontology-injector (OWL RL)</text>
+
+  <rect x="840" y="380" width="300" height="52" rx="8" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text x="856" y="412" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" fill="#065f46">erp-connector, data-analysis</text>
+
+  <rect x="40" y="514" width="1100" height="60" rx="10" fill="#0f172a"/>
+  <text x="60" y="550" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="16" font-weight="600" fill="#f8fafc">Cordis runtime</text>
+  <text x="168" y="550" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" fill="#cbd5e1">every capability is a registered effect, every extension is a plugin, and the agent loop stays unchanged</text>
+
+  <text x="590" y="608" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" fill="#64748b">Python SDK mirrors the same session events and persistence format.</text>
+</svg>

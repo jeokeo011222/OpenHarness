@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 400" width="1180" height="400" role="img" aria-label="Ontology injection pipeline: sources, store, inference, summary, agent context, ERP call">
+  <rect width="1180" height="400" fill="#ffffff"/>
+  <text x="40" y="44" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="22" font-weight="700" fill="#0f172a">Ontology injection pipeline</text>
+  <text x="40" y="70" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" fill="#475569">Business knowledge becomes agent context before the first step of every turn.</text>
+
+  <rect x="40" y="100" width="160" height="96" rx="10" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="120" y="128" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#1e3a8a">Turtle OWL/RDF</text>
+  <text x="120" y="150" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">contracts, procurement,</text>
+  <text x="120" y="168" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">inventory per domain</text>
+
+  <path d="M210 148 L244 148" stroke="#94a3b8" stroke-width="2"/>
+  <path d="M236 142 L246 148 L236 154" fill="#94a3b8"/>
+
+  <rect x="250" y="100" width="160" height="96" rx="10" fill="#f5f3ff" stroke="#ddd6fe"/>
+  <text x="330" y="128" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#4c1d95">rdflib parse</text>
+  <text x="330" y="150" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">classes, properties,</text>
+  <text x="330" y="168" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">individuals</text>
+
+  <path d="M420 148 L454 148" stroke="#94a3b8" stroke-width="2"/>
+  <path d="M446 142 L456 148 L446 154" fill="#94a3b8"/>
+
+  <rect x="460" y="100" width="160" height="96" rx="10" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text x="540" y="128" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#065f46">oxigraph store</text>
+  <text x="540" y="150" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">graph.db.nq plus</text>
+  <text x="540" y="168" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">uploaded sources</text>
+
+  <path d="M630 148 L664 148" stroke="#94a3b8" stroke-width="2"/>
+  <path d="M656 142 L666 148 L656 154" fill="#94a3b8"/>
+
+  <rect x="670" y="100" width="160" height="96" rx="10" fill="#fffbeb" stroke="#fde68a"/>
+  <text x="750" y="128" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#92400e">OWL RL inference</text>
+  <text x="750" y="150" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#78350f">5 rules, 5 s budget</text>
+  <text x="750" y="168" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#78350f">subclass, domain/range</text>
+
+  <path d="M840 148 L874 148" stroke="#94a3b8" stroke-width="2"/>
+  <path d="M866 142 L876 148 L866 154" fill="#94a3b8"/>
+
+  <rect x="880" y="100" width="260" height="96" rx="10" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="1010" y="128" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#1e3a8a">Pre-step summary injector</text>
+  <text x="1010" y="150" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">classes, relations and call sites</text>
+  <text x="1010" y="168" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">added to the model context</text>
+
+  <path d="M1010 208 L1010 232 L120 232 L120 254" stroke="#94a3b8" stroke-width="2" fill="none"/>
+  <path d="M114 248 L120 258 L126 248" fill="#94a3b8"/>
+
+  <rect x="40" y="260" width="460" height="86" rx="10" fill="#f5f3ff" stroke="#ddd6fe"/>
+  <text x="62" y="290" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="15" font-weight="600" fill="#4c1d95">Agent context (pre-step)</text>
+  <text x="62" y="314" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">The model knows which entities exist, how they relate,</text>
+  <text x="62" y="332" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">and where each action is exposed in the ERP.</text>
+
+  <path d="M510 303 L544 303" stroke="#94a3b8" stroke-width="2"/>
+  <path d="M536 297 L546 303 L536 309" fill="#94a3b8"/>
+
+  <rect x="550" y="260" width="300" height="86" rx="10" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text x="572" y="290" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="15" font-weight="600" fill="#065f46">ERP connector</text>
+  <text x="572" y="314" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">Zod config, adapter registry,</text>
+  <text x="572" y="332" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#334155">transformer pipeline</text>
+
+  <path d="M860 303 L894 303" stroke="#94a3b8" stroke-width="2"/>
+  <path d="M886 297 L896 303 L886 309" fill="#94a3b8"/>
+
+  <rect x="900" y="260" width="240" height="86" rx="10" fill="#fffbeb" stroke="#fde68a"/>
+  <text x="1020" y="290" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="15" font-weight="600" fill="#92400e">Yonyou U8 / Kingdee</text>
+  <text x="1020" y="314" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#78350f">Stateless router: no ERP</text>
+  <text x="1020" y="332" text-anchor="middle" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#78350f">records are stored locally</text>
+
+  <text x="40" y="384" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12" fill="#64748b">Publishing an ontology runs SHACL double verification; the injected summary is rebuilt from the store, never hand-edited.</text>
+</svg>

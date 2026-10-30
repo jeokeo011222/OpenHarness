@@ -3,35 +3,44 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write README.md
 /ontology-openharness:
-  en: b184a48698177ab3
-  zh: 93f4bbc416b7910f
+  en: 8e8d5a23405c64d1
+  zh: e5df7b3420f5f0e1
 /ontology-openharness/why-openharness:
-  en: d3236966bff67e6f
-  zh: ef384f492352e4d5
+  en: 1d4cff0a49a37314
+  zh: 22de83d2967d6476
+/ontology-openharness/architecture-at-a-glance:
+  en: 318614b78e266a69
+  zh: c86d5cddf162cc6a
 /ontology-openharness/core-features:
-  en: 8a90fc49ba3149fe
-  zh: 6d2fd72a942fbbc6
+  en: 50cb72432e69e7eb
+  zh: f9ba6ff08adec7e3
+/ontology-openharness/ontology-injection-pipeline:
+  en: 626d3f58b4fa5690
+  zh: 66e79365a53532c2
+/ontology-openharness/local-accounts-and-the-admin-workbench:
+  en: cc6e4d8d88fa47a2
+  zh: 8df52a0d8a2ee91e
 /ontology-openharness/quick-start:
-  en: 8ec74775c35e8133
+  en: 51ed2d6bea3c2526
   zh: 041de6b4cd4d0f81
 /ontology-openharness/quick-start/prerequisites:
   en: 24ab104a19daa1fc
   zh: 7f92cebeff0ee670
 /ontology-openharness/quick-start/install-run:
-  en: 4b671523867e0a18
-  zh: d7032c16fdad6ba1
+  en: 67f4364ea17094e4
+  zh: 15556ea81b29df90
 /ontology-openharness/monorepo-layout:
-  en: 2adf41379bf0c5ef
+  en: 38f48d656ac26668
   zh: af157ae6dc821300
 /ontology-openharness/built-with:
-  en: af5afd848a528dc2
-  zh: fe35fd43277ca46f
+  en: cccff9f60b043a66
+  zh: 874c5e305ce98e44
 /ontology-openharness/faq:
-  en: 9556b54c25799257
-  zh: fe1a3f4ffec7863a
+  en: cf2b3bbbc175b16b
+  zh: 964b764c1ba1dc3b
 /ontology-openharness/contributing:
-  en: 2742237a13a8ec3f
-  zh: 41ec2be2d9034660
+  en: 4849b2a83e0bacd1
+  zh: f14f37bb1a5e3357
 /ontology-openharness/license:
   en: d92c9d0d1f4ae5f4
   zh: fd2748aad96d5631
