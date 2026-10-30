@@ -150,6 +150,10 @@ Openharness/
 
 **Q: Where does my ERP data live?** OpenHarness stores no ERP records. The connector is a stateless router that delegates to configured adapters, and credentials stay in local `cordis.yml` overlays that are never committed.
 
+## 🏷️ Keywords
+
+Agent harness · Ontology (OWL/RDF) · Knowledge graph · ERP connector · Yonyou U8 · Kingdee · SHACL · MCP · Plugin architecture · TypeScript · Electron · Web UI · Local accounts · RBAC · SQLite · Python SDK
+
 ## 🤝 Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development conventions, gates, and the plugin authoring guide. Plugins, adapters, and documentation fixes are all welcome.

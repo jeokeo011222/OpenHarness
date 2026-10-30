@@ -152,6 +152,10 @@ Openharness/
 
 **Q: ERP 数据存在哪里？** OpenHarness 不存储任何 ERP 记录。连接器是无状态路由层，全权委托给已配置的适配器，凭据只存在本地 `cordis.yml` overlay 中，不会被提交。
 
+## 🏷️ 关键词
+
+智能体运行时（agent harness）· 本体 OWL/RDF · 知识图谱 · ERP 连接器 · 用友 U8 · 金蝶云·星空 · SHACL · MCP · 插件架构 · TypeScript · Electron · Web UI · 本地账号 · RBAC · SQLite · Python SDK
+
 ## 🤝 贡献
 
 开发约定、门禁与插件编写指南详见 [CONTRIBUTING.zh.md](CONTRIBUTING.zh.md)。插件、适配器与文档修正——所有贡献均欢迎。
