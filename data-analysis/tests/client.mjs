@@ -79,8 +79,10 @@ test('no hardcoded colors in panel styles', () => {
   assert.ok(cssSource.includes('var(--dsw-alias-'))
 })
 
-test('apply registers dictionaries, the tab type, the body, and styles', () => {
-  assert.deepEqual(plugin.inject, ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight', 'remote', 'remote.workspaceFiles'])
+test('apply registers dictionaries, the workbench page, the sidebar row, the tab type, the body, and styles', () => {
+  assert.deepEqual(plugin.inject, [
+    'slots', 'locale', 'layout', 'uiSession', 'sidebarRightTabs', 'sidebarRight', 'remote', 'remote.workspaceFiles',
+  ])
   const effects = []
   const locales = []
   const tabs = []
@@ -115,11 +117,23 @@ test('apply registers dictionaries, the tab type, the body, and styles', () => {
   assert.equal(tabs[0].guide[0].title(), '数据分析')
   assert.equal(typeof tabs[0].guide[0].icon, 'function')
   assert.equal(tabs[0].guide[0].icon({}).type, 'svg')
-  assert.equal(slots.length, 1)
-  assert.equal(slots[0].spec.key, 'dsh-data-analysis')
+  assert.equal(slots.length, 3)
+  assert.equal(slots[0].spec.name, 'main')
+  assert.equal(slots[0].spec.key, 'data-analysis')
   assert.equal(slots[0].spec.locale, 'dataAnalysis')
-  assert.equal(typeof slots[0].spec.inject, 'function')
-  assert.equal(slots[0].component.name, 'AnalysisPanel')
+  assert.equal(typeof slots[0].component, 'function')
+  assert.equal(slots[1].spec.name, 'sidebar.panellist')
+  assert.equal(slots[1].spec.id, 'data-analysis')
+  assert.equal(slots[1].spec.order, 30)
+  assert.equal(slots[1].spec.label(), '数据分析')
+  assert.equal(typeof slots[1].component, 'function')
+  assert.equal(slots[1].component({}).type, 'svg')
+  assert.equal(slots[2].spec.key, 'dsh-data-analysis')
+  assert.equal(slots[2].spec.locale, 'dataAnalysis')
+  assert.equal(typeof slots[2].spec.inject, 'function')
+  assert.equal(slots[2].component.name, 'AnalysisPanel')
+  assert.ok(effects.some(label => label.includes('workbench page')))
+  assert.ok(effects.some(label => label.includes('sidebar row')))
   assert.ok(effects.some(label => label.includes('styles')))
   assert.ok(effects.some(label => label.includes('tab body')))
 })

@@ -13,6 +13,7 @@ window.__ModuleLoader__.load({
     const e = React.createElement
 
     const NS = 'dataAnalysis'
+    const PANEL_ID = 'data-analysis'
     const TAB_ID = 'dsh-data-analysis'
     const TAB_KIND = 'data-analysis'
     const ROW_LIMIT = 5000
@@ -25,6 +26,8 @@ window.__ModuleLoader__.load({
       'tab.title': '数据分析',
       'guide.title': '数据分析',
       'guide.description': '查看 Agent 导入的数据集：字段、样本、图表与已保存的可视化。',
+      'page.back': '返回对话',
+      'page.noSession': '请先打开一个对话，再查看它的数据分析。',
       'action.refresh': '刷新',
       'list.title': '数据集',
       'list.empty': '还没有数据集。让 Agent 用 dataset_import_file、db_import_table 或 api_import 导入后再回来查看。',
@@ -115,6 +118,8 @@ window.__ModuleLoader__.load({
       'tab.title': 'Data analysis',
       'guide.title': 'Data analysis',
       'guide.description': 'Inspect datasets the agent imported: fields, sample rows, charts, and saved visualizations.',
+      'page.back': 'Back to conversation',
+      'page.noSession': 'Open a conversation first, then inspect its datasets here.',
       'action.refresh': 'Refresh',
       'list.title': 'Datasets',
       'list.empty': 'No datasets yet. Let the agent import with dataset_import_file, db_import_table, or api_import, then come back.',
@@ -255,6 +260,13 @@ window.__ModuleLoader__.load({
 .da-c6 { --da-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 45%, var(--dsw-alias-bg-base)); }
 .da-fill { fill: var(--da-color); }
 .da-stroke { stroke: var(--da-color); }
+.da-page { display: flex; flex-direction: column; gap: 10px; padding: 14px 18px; box-sizing: border-box; height: 100%; overflow-y: auto; color: var(--dsw-alias-label-primary); font-size: 12px; }
+.da-page-head { display: flex; align-items: center; gap: 10px; }
+.da-page-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--dsw-alias-label-primary); }
+.da-page-back { font: inherit; font-size: 12px; padding: 3px 10px; border: 1px solid var(--dsw-alias-border-l3); border-radius: var(--dsw-radius-sm); background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; }
+.da-page-back:hover { border-color: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-label-primary); }
+.da-page-back:focus-visible { outline: 1px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
+.da-page-body { flex: 1; min-height: 0; }
 `
 
     /**
@@ -1809,15 +1821,71 @@ window.__ModuleLoader__.load({
       return body
     }
 
-    const inject = ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight', 'remote', 'remote.workspaceFiles']
+    /**
+     * Read the Session shown in the main column and rerender when it changes.
+     * @param ctx - Client plugin context.
+     * @returns Current Session id, or undefined when the column shows no Session.
+     */
+    function useCurrentSessionId(ctx) {
+      const source = ctx.uiSession.adapter.current
+      const subscribe = React.useCallback(listener => source.subscribe(listener), [source])
+      const getSnapshot = React.useCallback(() => source.getSnapshot().key, [source])
+      return React.useSyncExternalStore(subscribe, getSnapshot)
+    }
 
     /**
-     * Register the dictionaries, the right-sidebar tab type, and its body.
+     * Left-sidebar workbench page: the analysis panel over the Session on
+     * screen, so the feature is reachable without opening the right sidebar.
+     * @param props - Standard props plus the Client plugin context.
+     * @returns Page element.
+     */
+    function AnalysisPage(props) {
+      const { ctx, t } = props
+      const sessionId = useCurrentSessionId(ctx)
+      const controller = React.useMemo(() => new AbortController(), [sessionId])
+      React.useEffect(() => () => controller.abort(), [controller])
+      const face = React.useMemo(
+        () => (sessionId === undefined ? null : createFace(ctx, sessionId)),
+        [ctx, sessionId])
+      const useTabInfo = React.useCallback(() => ({ tab: { signal: controller.signal } }), [controller])
+      return e('div', { className: 'da-page' },
+        e('div', { className: 'da-page-head' },
+          e('button', {
+            type: 'button',
+            className: 'da-page-back',
+            onClick: () => { ctx.layout.selectPanel('conversation') },
+          }, t('page.back')),
+          e('h1', { className: 'da-page-title' }, t('tab.title'))),
+        sessionId === undefined || face === null
+          ? e('p', { className: 'da-empty' }, t('page.noSession'))
+          : e('div', { className: 'da-page-body' },
+            e(AnalysisPanel, { ...props, ...face, useTabInfo })))
+    }
+
+    const inject = ['slots', 'locale', 'layout', 'uiSession', 'sidebarRightTabs', 'sidebarRight', 'remote', 'remote.workspaceFiles']
+
+    /**
+     * Register the dictionaries, the left-sidebar page, the right-sidebar tab
+     * type, and its body.
      * @param ctx - Client plugin context.
      */
     function apply(ctx) {
       ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-data-analysis: dictionaries')
       const t = ctx.locale.bind(NS)
+
+      ctx.effect(() => ctx.slots.inject('main', () => ctx.slots.register({
+        name: 'main',
+        key: PANEL_ID,
+        locale: NS,
+      }, props => e(AnalysisPage, { ...props, ctx }))), 'dsh-data-analysis: workbench page')
+
+      ctx.effect(() => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
+        name: 'sidebar.panellist',
+        id: PANEL_ID,
+        order: 30,
+        locale: NS,
+        label: () => t('tab.title'),
+      }, GuideArtwork)), 'dsh-data-analysis: sidebar row')
 
       ctx.effect(() => ctx.sidebarRightTabs.register({
         id: TAB_ID,
