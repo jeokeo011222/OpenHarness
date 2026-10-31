@@ -41,6 +41,12 @@ apps/web/dist/
 .dsh-build/
 .dsh-report/
 .playwright-mcp/
+.playwright-cli/
+.screenshots/
+.trae/
+.workbuddy/
+.pytest_cache/
+**/.venv/
 .orig
 .worktrees/
 worktrees/
