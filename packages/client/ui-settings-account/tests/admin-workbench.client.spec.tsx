@@ -299,7 +299,7 @@ it('switches to permissions: sets a grant, revokes it, and shows the empty state
   expect(set.body.get('resourceId')).toBe('ops')
   expect(set.body.getAll('roles')).toEqual(['author', 'viewer'])
   expect(kindSelect.value).toBe('')
-  expect(screen.getByLabelText(en.adminResourceId).value).toBe('')
+  expect((screen.getByLabelText(en.adminResourceId) as HTMLInputElement).value).toBe('')
   expect(accountSelect.value).toBe('u1')
 
   fireEvent.click(screen.getAllByText(en.adminDelete, { selector: 'td > button' })[0]!)

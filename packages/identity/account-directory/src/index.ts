@@ -579,15 +579,16 @@ export class AccountDirectory extends Service {
     return { kinds, resources }
   }
 
-  private registerBaseline(bindings: (userId: UserId) => readonly RemoteAccessBinding[]): () => void {    const dispose = this.ctx.effect(() => {
-    this.baselines.add(bindings)
-    this.invalidateAll()
-    return () => {
-      this.baselines.delete(bindings)
+  private registerBaseline(bindings: (userId: UserId) => readonly RemoteAccessBinding[]): () => void {
+    const dispose = this.ctx.effect(() => {
+      this.baselines.add(bindings)
       this.invalidateAll()
-    }
-  }, 'account-directory: ACL baseline')
-  return () => { void dispose() }
+      return () => {
+        this.baselines.delete(bindings)
+        this.invalidateAll()
+      }
+    }, 'account-directory: ACL baseline')
+    return () => { void dispose() }
   }
 
   private invalidate(userId: UserId): void {
@@ -803,7 +804,10 @@ export class AccountDirectory extends Service {
     })
   }
 
-  /** JSON state for the client workbench: the caller's account, every account and grant, and the resource dictionary the grant form picks from. */
+  /**
+   * JSON state for the client workbench: the caller's account, every account and
+   * grant, and the resource dictionary the grant form picks from.
+   */
   private async handleAdminState(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (!this.isReadSafe(req)) { res.writeHead(405); res.end(); return }
     const account = this.sessionAccount(req)

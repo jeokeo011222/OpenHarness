@@ -868,7 +868,7 @@ export function adminPage(
         </div>
         <table>
           <thead><tr><th>角色</th><th>范围</th><th>持有人</th></tr></thead>
-          <tbody>${roleRows}</tbody>
+          <tbody>${roleRows.join('')}</tbody>
         </table>
       </div>
     </section>

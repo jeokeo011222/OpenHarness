@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import type { RemoteAccessBinding, RemoteAccessPolicy } from '@deepseek-ai/dsh-api-remote-access'
+import type { RemoteAccessBinding, RemoteAccessPolicy, RemoteAccessResourceKind } from '@deepseek-ai/dsh-api-remote-access'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import AccountDirectory, { AccountDirectoryError } from '../src/index.ts'
 import { hashPassword } from '../src/password.ts'
@@ -573,7 +573,7 @@ describe('resource dictionary', () => {
     const bob = await harness.service.register({ username: 'bob', password: PASSWORD })
     // A kind with an ACL rule but no catalog: it must still be offered, so the
     // administrator can at least see the kind exists.
-    harness.service.acl.register({ kind: 'declared-only', bind: () => [] })
+    harness.service.acl.register({ kind: 'declared-only' as RemoteAccessResourceKind, bind: () => [] })
     harness.service.catalog.register({
       kind: 'ontology-domain',
       label: '本体域',
