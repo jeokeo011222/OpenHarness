@@ -28,22 +28,58 @@ export function findConnection(connections, id) {
 }
 
 /**
- * Resolve a connection URL from an environment variable, never from stored config.
+ * Compose a connection URL from the host / port / user / database form.
+ *
+ * Credentials are percent-encoded, so a password containing `@`, `/`, or `:` —
+ * all common in real deployments — still parses as one URL.
+ * @param connection - Connection descriptor with structured fields.
+ * @returns Connection string.
+ */
+export function composeConnectionUrl(connection) {
+  const kind = connection.kind === 'mysql' ? 'mysql' : 'postgres'
+  const host = String(connection.host ?? '').trim()
+  if (host.length === 0) {
+    throw new AnalysisError(`Connection "${connection.id}" has no host to connect to.`, 'missing_credentials')
+  }
+  const rawPort = Number(connection.port)
+  const port = Number.isInteger(rawPort) && rawPort > 0 ? rawPort : (kind === 'mysql' ? 3306 : 5432)
+  const user = connection.user === undefined || connection.user === '' ? '' : encodeURIComponent(String(connection.user))
+  const password = typeof connection.password === 'string' && connection.password.length > 0
+    ? `:${encodeURIComponent(connection.password)}`
+    : ''
+  const credentials = user.length > 0 ? `${user}${password}@` : ''
+  const database = typeof connection.database === 'string' && connection.database.length > 0
+    ? `/${encodeURIComponent(connection.database)}`
+    : ''
+  // IPv6 literals need brackets before a port can be appended.
+  const authority = host.includes(':') && !host.startsWith('[') ? `[${host}]` : host
+  return `${kind}://${credentials}${authority}:${port}${database}`
+}
+
+/**
+ * Resolve a connection URL.
+ *
+ * Three shapes are accepted, most explicit first: a full `url` typed into the
+ * advanced field, the host / port / user / password / database form, or
+ * `urlEnv` naming an environment variable. `url` stays the recommended way to
+ * keep a checked-in secret out of the workspace file.
  * @param connection - Connection descriptor.
  * @returns Connection string.
  */
 function resolveConnectionUrl(connection) {
-  if (typeof connection.urlEnv !== 'string' || connection.urlEnv.length === 0) {
-    throw new AnalysisError(
-      `Connection "${connection.id}" needs urlEnv naming an environment variable that holds its URL; secrets never live in config.`,
-      'missing_credentials',
-    )
+  if (typeof connection.url === 'string' && connection.url.length > 0) return connection.url
+  if (typeof connection.urlEnv === 'string' && connection.urlEnv.length > 0) {
+    const value = process.env[connection.urlEnv]
+    if (value === undefined || value.length === 0) {
+      throw new AnalysisError(`Environment variable "${connection.urlEnv}" is not set.`, 'missing_credentials')
+    }
+    return value
   }
-  const value = process.env[connection.urlEnv]
-  if (value === undefined || value.length === 0) {
-    throw new AnalysisError(`Environment variable "${connection.urlEnv}" is not set.`, 'missing_credentials')
-  }
-  return value
+  if (typeof connection.host === 'string' && connection.host.length > 0) return composeConnectionUrl(connection)
+  throw new AnalysisError(
+    `Connection "${connection.id}" needs a host and user, a connection URL, or urlEnv naming an environment variable that holds its URL.`,
+    'missing_credentials',
+  )
 }
 
 /**
@@ -150,6 +186,9 @@ async function openPostgres(connection, timeoutMs) {
     connectionString: url,
     statement_timeout: timeoutMs,
     connectionTimeoutMillis: timeoutMs,
+    // Internal databases usually carry a self-signed certificate; the form's
+    // "require TLS" means "encrypt the link", not "verify the chain".
+    ...(connection.ssl === 'require' ? { ssl: { rejectUnauthorized: false } } : {}),
   })
   await client.connect()
   return {
@@ -181,7 +220,11 @@ async function openMysql(connection, timeoutMs) {
     throw new AnalysisError('MySQL support needs the optional `mysql2` package in the profile; add it before using this connection.', 'driver_missing')
   }
   const url = resolveConnectionUrl(connection)
-  const client = await mysql.createConnection({ uri: url, connectTimeout: timeoutMs })
+  const client = await mysql.createConnection({
+    uri: url,
+    connectTimeout: timeoutMs,
+    ...(connection.ssl === 'require' ? { ssl: { rejectUnauthorized: false } } : {}),
+  })
   await client.query(`SET SESSION max_execution_time = ${Math.max(1000, Math.trunc(timeoutMs))}`)
   return {
     async run(sql) {
@@ -209,11 +252,22 @@ async function openConnection(connection, cwd) {
   if (connection.kind === 'sqlite') {
     return { ...(await openSqlite(connection, cwd)), kind: 'sqlite' }
   }
-  if (connection.kind === 'postgres' || connection.kind === 'postgresql') {
-    return { ...(await openPostgres(connection, timeoutMs)), kind: 'postgres' }
-  }
-  if (connection.kind === 'mysql') {
-    return { ...(await openMysql(connection, timeoutMs)), kind: 'mysql' }
+  const where = typeof connection.host === 'string' && connection.host.length > 0
+    ? `${connection.host}:${connection.port ?? (connection.kind === 'mysql' ? 3306 : 5432)}`
+    : connection.id
+  try {
+    if (connection.kind === 'postgres' || connection.kind === 'postgresql') {
+      return { ...(await openPostgres(connection, timeoutMs)), kind: 'postgres' }
+    }
+    if (connection.kind === 'mysql') {
+      return { ...(await openMysql(connection, timeoutMs)), kind: 'mysql' }
+    }
+  } catch (error) {
+    // Driver failures are user input problems — a wrong host, port, password,
+    // or a missing TLS handshake — not a bug in the plugin. Report them as such
+    // so the dialog shows the driver's own words instead of "internal error".
+    if (error instanceof AnalysisError) throw error
+    throw new AnalysisError(`Could not connect to ${where}: ${error.message}`, 'connect_failed')
   }
   throw new AnalysisError(`Unsupported connection kind "${connection.kind}". Use sqlite, postgres, or mysql.`, 'bad_connection')
 }

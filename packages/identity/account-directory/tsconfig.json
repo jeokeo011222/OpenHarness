@@ -28,6 +28,9 @@
     },
     {
       "path": "../../host/webserver"
+    },
+    {
+      "path": "../../settings/settings"
     }
   ]
 }

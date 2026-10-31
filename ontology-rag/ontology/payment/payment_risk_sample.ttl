@@ -1,0 +1,146 @@
+@prefix pay:  <http://ontorag.local/payment#> .
+@prefix d:    <urn:ontorag:tenant:demo:payment:> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+## ===========================================================================
+## 样例数据：每条规则都有明确的触发点与被放行点
+##
+## 设计原则：每个用例只触发它要证明的那一条规则，其余规则必须放行。
+## 否则"跑出 6 条违规"无法说明是哪条规则在起作用。
+##
+## 合同剩余应付（规则 1 的分母）：
+##   C-001 执行中：10000000.00 × (1-0.05) - 4000000.00 = 5500000.00
+##   C-002 已关闭（有 closedAt）：2000000.00 - 1000000.00       = 1000000.00
+##   C-003 已关闭（缺 closedAt） ：1000000.00 - 0                = 1000000.00
+##   C-004 执行中                 ：3000000.00 - 0                = 3000000.00
+##
+## 期望结果（详见 tests/test_payment_ontology.py）：
+##   PAY-001  合规，零违规                                  —— 放行点
+##   PAY-002  6000000 > 5500000                             —— 规则 1
+##   PAY-003  未关联合同                                     —— 规则 2（0 份）
+##   PAY-004  关联 C-001 与 C-004 两份                       —— 规则 2（2 份）
+##   PAY-005  关闭后提交（2026-06-01 >= 2026-03-31）          —— 规则 3
+##   PAY-006  C-003 已关闭但没有 closedAt                    —— 规则 3' 告警
+##   PAY-007  金额写成千分位字符串，超付规则算不出来          —— 类型约束兜底
+## ===========================================================================
+
+## ------------------------------ 项目 ------------------------------
+
+d:P-001 a pay:Project ;
+    pay:projectCode "P-001" ;
+    pay:projectName "市政道路改造工程" ;
+    pay:hasContract d:C-001 .
+
+## ------------------------------ 合同 ------------------------------
+
+d:C-001 a pay:Contract ;
+    pay:contractNo "HT-2026-001" ;
+    pay:contractAmount "10000000.00"^^xsd:decimal ;
+    pay:paidAmount "4000000.00"^^xsd:decimal ;
+    pay:retentionRate "0.05"^^xsd:decimal ;
+    pay:status pay:StatusExecuting ;
+    pay:signedAt "2026-01-15"^^xsd:date ;
+    pay:belongsToProject d:P-001 .
+
+d:C-002 a pay:Contract ;
+    pay:contractNo "HT-2026-002" ;
+    pay:contractAmount "2000000.00"^^xsd:decimal ;
+    pay:paidAmount "1000000.00"^^xsd:decimal ;
+    pay:retentionRate "0.00"^^xsd:decimal ;
+    pay:status pay:StatusClosed ;
+    pay:closedAt "2026-03-31T17:00:00"^^xsd:dateTime ;
+    pay:belongsToProject d:P-001 .
+
+# C-003 故意不带 closedAt：用来证明规则 3 不会误判，规则 3' 会接手告警。
+d:C-003 a pay:Contract ;
+    pay:contractNo "HT-2026-003" ;
+    pay:contractAmount "1000000.00"^^xsd:decimal ;
+    pay:paidAmount "0.00"^^xsd:decimal ;
+    pay:status pay:StatusClosed ;
+    pay:belongsToProject d:P-001 .
+
+d:C-004 a pay:Contract ;
+    pay:contractNo "HT-2026-004" ;
+    # 用整数字面量而非 xsd:decimal，验证金额检查不会把 xsd:integer 误判违规
+    pay:contractAmount 3000000 ;
+    pay:paidAmount 0 ;
+    pay:retentionRate "0.00"^^xsd:decimal ;
+    pay:status "executing" ;
+    pay:belongsToProject d:P-001 .
+
+## ------------------------------ 变更单 ------------------------------
+
+d:CO-001 a pay:ChangeOrder ;
+    pay:changeOrderNo "BG-2026-001" ;
+    pay:changeOrderAmount "500000.00"^^xsd:decimal ;
+    pay:approvedAt "2026-04-01"^^xsd:date .
+
+d:C-001 pay:hasChangeOrder d:CO-001 .
+
+## ------------------------------ 付款申请 ------------------------------
+
+# 合规样例：5000000 <= 5500000，且合同执行中
+d:PAY-001 a pay:PaymentApplication ;
+    pay:applicationNo "FK-2026-001" ;
+    pay:appliedAmount "5000000.00"^^xsd:decimal ;
+    pay:appliedAt "2026-05-10T09:00:00"^^xsd:dateTime ;
+    pay:againstContract d:C-001 .
+
+# 规则 1：超付 500000
+d:PAY-002 a pay:PaymentApplication ;
+    pay:applicationNo "FK-2026-002" ;
+    pay:appliedAmount "6000000.00"^^xsd:decimal ;
+    pay:appliedAt "2026-05-11T09:00:00"^^xsd:dateTime ;
+    pay:againstContract d:C-001 .
+
+# 规则 2（minCount 0）：没有付款依据
+d:PAY-003 a pay:PaymentApplication ;
+    pay:applicationNo "FK-2026-003" ;
+    pay:appliedAmount "100000.00"^^xsd:decimal ;
+    pay:appliedAt "2026-05-12T09:00:00"^^xsd:dateTime .
+
+# 规则 2（maxCount 2）：同时挂两份执行中的合同，无法确定扣减哪一份
+d:PAY-004 a pay:PaymentApplication ;
+    pay:applicationNo "FK-2026-004" ;
+    pay:appliedAmount "100000.00"^^xsd:decimal ;
+    pay:appliedAt "2026-05-12T10:00:00"^^xsd:dateTime ;
+    pay:againstContract d:C-001 , d:C-004 .
+
+# 规则 3：300000 <= 1000000（规则 1 放行），但提交时间晚于 C-002 关闭时间
+d:PAY-005 a pay:PaymentApplication ;
+    pay:applicationNo "FK-2026-005" ;
+    pay:appliedAmount "300000.00"^^xsd:decimal ;
+    pay:appliedAt "2026-06-01T09:00:00"^^xsd:dateTime ;
+    pay:againstContract d:C-002 .
+
+# 规则 3'：C-003 已关闭但没有 closedAt，无法判定先后
+d:PAY-006 a pay:PaymentApplication ;
+    pay:applicationNo "FK-2026-006" ;
+    pay:appliedAmount "200000.00"^^xsd:decimal ;
+    pay:appliedAt "2026-07-01T09:00:00"^^xsd:dateTime ;
+    pay:againstContract d:C-003 .
+
+# 类型兜底：金额是千分位字符串，xsd:decimal() 转换失败 → 规则 1 的整行会被丢弃
+# （看起来"通过"），必须由类型约束把它拦下来。这条数据是"静默漏报"的活样本。
+d:PAY-007 a pay:PaymentApplication ;
+    pay:applicationNo "FK-2026-007" ;
+    pay:appliedAmount "7,000,000.00" ;
+    pay:appliedAt "2026-05-13T09:00:00"^^xsd:dateTime ;
+    pay:againstContract d:C-001 .
+
+## ------------------------------ 发票 ------------------------------
+
+d:INV-001 a pay:Invoice ;
+    pay:invoiceNo "FP-2026-001" ;
+    pay:invoiceAmount "5000000.00"^^xsd:decimal ;
+    pay:issuedAt "2026-05-09"^^xsd:date .
+
+d:INV-002 a pay:Invoice ;
+    pay:invoiceNo "FP-2026-002" ;
+    pay:invoiceAmount "6000000.00"^^xsd:decimal ;
+    pay:issuedAt "2026-05-09"^^xsd:date .
+
+d:PAY-001 pay:hasInvoice d:INV-001 .
+d:PAY-002 pay:hasInvoice d:INV-002 .

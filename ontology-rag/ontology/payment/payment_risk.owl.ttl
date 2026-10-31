@@ -1,0 +1,273 @@
+@prefix pay:  <http://ontorag.local/payment#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+## ===========================================================================
+## 合同付款风控本体（Contract Payment Risk Ontology）
+##
+## 用途：为「付款申请能不能付」这条业务判断提供显式语义，并作为 SHACL 闸门的
+## 取值空间（见同目录 payment_risk_shapes.ttl）。
+##
+## 建模决策（都有代价，记下来免得后人反复推翻）：
+##   1. 金额一律 xsd:decimal，不建 MonetaryAmount 中间节点。本领域的金额是
+##      「单据上的一个字段」，不是可独立引用、可挂汇率/币种的对象；建中间节点
+##      会让每个约束都多一跳 join，却没换来任何查询能力。
+##   2. 合同状态用「个体」而不是字符串字面量（pay:StatusClosed，而非 "closed"）。
+##      状态是受控词表，用 IRI 才能被约束、被同义词表映射、被前端下拉框直接消费。
+##      同时用 skos:notation 保留字符串形态，历史数据按 notation 对齐即可。
+##   3. pay:remainingPayableAmount 是**派生字段**（合同额×(1-质保金比例)-已付）。
+##      允许物化存储以加速查询，但 SHACL 里用 COALESCE 优先取物化值、缺失时现算，
+##      因此「忘了物化」只会慢，不会误判。
+##   4. ChangeOrder 通过 pay:hasChangeOrder 挂在合同上。变更单不直接挂付款申请：
+##      真实的付款是"合同（含已批准变更）下的付款"，中间再插一层会把审批链路
+##      复制两遍。变更单金额暂不并入剩余应付（口径见文件末尾说明）。
+##
+## 本文件自包含：不 owl:imports 任何外部本体，Protégé 打开不会去解析外部 IRI。
+## ===========================================================================
+
+pay: a owl:Ontology ;
+    rdfs:label "合同付款风控本体"@zh , "Contract Payment Risk Ontology"@en ;
+    rdfs:comment "付款申请的合规判定语义：项目—合同—付款申请—发票—变更单。"@zh ;
+    owl:versionInfo "1.0.0" ;
+    owl:versionIRI <http://ontorag.local/payment#1.0.0> .
+
+## ---------------------------------------------------------------------------
+## 类
+## ---------------------------------------------------------------------------
+
+pay:Project a owl:Class ;
+    rdfs:label "项目"@zh , "Project"@en ;
+    rdfs:comment "成本归集与合同归属的单位。一个项目下可有多份合同。"@zh .
+
+pay:Contract a owl:Class ;
+    rdfs:label "合同"@zh , "Contract"@en ;
+    rdfs:comment "合同主数据。pay:contractAmount 为含税总额。"@zh .
+
+pay:PaymentApplication a owl:Class ;
+    rdfs:label "付款申请"@zh , "Payment application"@en ;
+    rdfs:comment "发起付款的业务单据，必须且只能挂一份合同。"@zh .
+
+pay:Invoice a owl:Class ;
+    rdfs:label "发票"@zh , "Invoice"@en ;
+    rdfs:comment "供应商开具的发票，通过 pay:hasInvoice 归集到付款申请。"@zh .
+
+pay:ChangeOrder a owl:Class ;
+    rdfs:label "变更单"@zh , "Change order"@en ;
+    rdfs:comment "合同金额或范围的批准变更，通过 pay:hasChangeOrder 挂在合同上。"@zh .
+
+pay:ContractStatus a owl:Class ;
+    rdfs:label "合同状态"@zh , "Contract status"@en ;
+    rdfs:comment "受控状态词表。个体即取值，禁止自由文本。"@zh .
+
+# 单据类之间互斥：一份单据不可能既是合同又是付款申请。
+# 显式声明互斥，HermiT 才能把"同时属于两类"的实例判为不可满足，
+# 否则 OWL 的开放世界假设会让这类错误静默通过。
+[] a owl:AllDisjointClasses ;
+    owl:members ( pay:Contract pay:PaymentApplication pay:Invoice pay:ChangeOrder ) .
+
+## ---------------------------------------------------------------------------
+## 对象属性
+## ---------------------------------------------------------------------------
+
+pay:hasContract a owl:ObjectProperty ;
+    rdfs:domain pay:Project ;
+    rdfs:range pay:Contract ;
+    owl:inverseOf pay:belongsToProject ;
+    rdfs:label "拥有合同"@zh , "has contract"@en ;
+    rdfs:comment "项目 → 合同。一个项目可有多份合同，故本属性不是函数式的。"@zh .
+
+pay:belongsToProject a owl:ObjectProperty ;
+    rdfs:domain pay:Contract ;
+    rdfs:range pay:Project ;
+    rdfs:label "所属项目"@zh , "belongs to project"@en .
+
+pay:againstContract a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:domain pay:PaymentApplication ;
+    rdfs:range pay:Contract ;
+    rdfs:label "对应合同"@zh , "against contract"@en ;
+    rdfs:comment """付款申请 → 合同。声明为 owl:FunctionalProperty 是约束 2
+（必须且只能关联一份合同）在 OWL 侧的表述；SHACL 侧用 minCount/maxCount 复核，
+两者不重复而是互补：OWL 管推理，SHACL 管数据校验。"""@zh .
+
+pay:hasInvoice a owl:ObjectProperty ;
+    rdfs:domain pay:PaymentApplication ;
+    rdfs:range pay:Invoice ;
+    rdfs:label "关联发票"@zh , "has invoice"@en ;
+    rdfs:comment "付款申请 → 发票，一对多：一次付款可对应多张发票。"@zh .
+
+pay:hasChangeOrder a owl:ObjectProperty ;
+    rdfs:domain pay:Contract ;
+    rdfs:range pay:ChangeOrder ;
+    rdfs:label "关联变更单"@zh , "has change order"@en .
+
+## ---------------------------------------------------------------------------
+## 数据类型属性
+## ---------------------------------------------------------------------------
+
+pay:projectCode a owl:DatatypeProperty ;
+    rdfs:domain pay:Project ;
+    rdfs:range xsd:string ;
+    rdfs:label "项目编号"@zh .
+
+pay:projectName a owl:DatatypeProperty ;
+    rdfs:domain pay:Project ;
+    rdfs:range xsd:string ;
+    rdfs:label "项目名称"@zh .
+
+pay:contractNo a owl:DatatypeProperty ;
+    rdfs:domain pay:Contract ;
+    rdfs:range xsd:string ;
+    rdfs:label "合同编号"@zh .
+
+pay:contractAmount a owl:DatatypeProperty ;
+    rdfs:domain pay:Contract ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "合同金额"@zh ;
+    rdfs:comment "含税总额，单位元。必须是显式 xsd:decimal——未标注类型的数字字面量会让不同引擎给出不同结论。"@zh .
+
+pay:paidAmount a owl:DatatypeProperty ;
+    rdfs:domain pay:Contract ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "已付金额"@zh ;
+    rdfs:comment "累计已付，单位元。缺失按 0 处理（COALESCE），不按「未知」处理。"@zh .
+
+pay:retentionRate a owl:DatatypeProperty ;
+    rdfs:domain pay:Contract ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "质保金比例"@zh ;
+    rdfs:comment "0~1 之间的小数（0.05 表示 5%）。质保金在竣工后释放，故不计入当前应付。"@zh .
+
+pay:remainingPayableAmount a owl:DatatypeProperty ;
+    rdfs:domain pay:Contract ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "剩余应付金额"@zh ;
+    rdfs:comment """派生字段：contractAmount × (1 - retentionRate) - paidAmount。
+可物化为三元组以加速比较；未物化时 SHACL 约束会现算，两者结果一致。"""@zh ;
+    skos:note "派生值一旦与明细冲突，以明细为准（SHACL 用 COALESCE 取物化值优先，仅在其缺失时现算，故冲突数据需靠账务对账而非闸门发现）。"@zh .
+
+pay:status a owl:DatatypeProperty ;
+    rdfs:domain pay:Contract ;
+    rdfs:range pay:ContractStatus ;
+    rdfs:label "合同状态"@zh .
+
+pay:signedAt a owl:DatatypeProperty ;
+    rdfs:domain pay:Contract ;
+    rdfs:range xsd:date ;
+    rdfs:label "签订日期"@zh .
+
+pay:closedAt a owl:DatatypeProperty ;
+    rdfs:domain pay:Contract ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "关闭时间"@zh ;
+    rdfs:comment "状态变为 closed 的时刻。缺这个字段就无法区分「关闭前的老付款」与「关闭后的新付款」，约束 3 会退化为告警。"@zh .
+
+pay:applicationNo a owl:DatatypeProperty ;
+    rdfs:domain pay:PaymentApplication ;
+    rdfs:range xsd:string ;
+    rdfs:label "付款申请编号"@zh .
+
+pay:appliedAmount a owl:DatatypeProperty ;
+    rdfs:domain pay:PaymentApplication ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "申请金额"@zh ;
+    rdfs:comment "本次申请支付的金额，单位元。"@zh .
+
+pay:appliedAt a owl:DatatypeProperty ;
+    rdfs:domain pay:PaymentApplication ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "申请时间"@zh .
+
+pay:invoiceNo a owl:DatatypeProperty ;
+    rdfs:domain pay:Invoice ;
+    rdfs:range xsd:string ;
+    rdfs:label "发票号"@zh .
+
+pay:invoiceAmount a owl:DatatypeProperty ;
+    rdfs:domain pay:Invoice ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "发票金额"@zh .
+
+pay:issuedAt a owl:DatatypeProperty ;
+    rdfs:domain pay:Invoice ;
+    rdfs:range xsd:date ;
+    rdfs:label "开票日期"@zh .
+
+pay:changeOrderNo a owl:DatatypeProperty ;
+    rdfs:domain pay:ChangeOrder ;
+    rdfs:range xsd:string ;
+    rdfs:label "变更单编号"@zh .
+
+pay:changeOrderAmount a owl:DatatypeProperty ;
+    rdfs:domain pay:ChangeOrder ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "变更金额"@zh ;
+    rdfs:comment "正数追加、负数核减。"@zh .
+
+pay:approvedAt a owl:DatatypeProperty ;
+    rdfs:domain pay:ChangeOrder ;
+    rdfs:range xsd:date ;
+    rdfs:label "变更批准日期"@zh .
+
+## ---------------------------------------------------------------------------
+## OWL 侧的结构公理
+##
+## 与 SHACL 的分工：这里描述"什么东西在逻辑上成立"，SHACL 描述"这条数据能不能
+## 放行"。OWL 的开放世界假设意味着少写一条三元组不等于违反约束，所以约束 2 的
+## "必须"只有 SHACL 的 minCount 能真正判定；此处只补"至多一份"与类型相容。
+## ---------------------------------------------------------------------------
+
+pay:PaymentApplication rdfs:subClassOf
+    [ a owl:Restriction ;
+      owl:onProperty pay:againstContract ;
+      owl:cardinality 1 ] ,
+    [ a owl:Restriction ;
+      owl:onProperty pay:againstContract ;
+      owl:allValuesFrom pay:Contract ] .
+
+pay:Project rdfs:subClassOf
+    [ a owl:Restriction ;
+      owl:onProperty pay:hasContract ;
+      owl:allValuesFrom pay:Contract ] .
+
+## ---------------------------------------------------------------------------
+## 合同状态词表
+## ---------------------------------------------------------------------------
+
+pay:StatusExecuting a owl:NamedIndividual , pay:ContractStatus ;
+    rdfs:label "执行中"@zh , "Executing"@en ;
+    skos:notation "executing" .
+
+pay:StatusClosed a owl:NamedIndividual , pay:ContractStatus ;
+    rdfs:label "已关闭"@zh , "Closed"@en ;
+    skos:notation "closed" ;
+    rdfs:comment "合同义务已履行完毕并归档。关闭后不得新增付款申请。"@zh .
+
+pay:StatusTerminated a owl:NamedIndividual , pay:ContractStatus ;
+    rdfs:label "已终止"@zh , "Terminated"@en ;
+    skos:notation "terminated" .
+
+pay:StatusSuspended a owl:NamedIndividual , pay:ContractStatus ;
+    rdfs:label "已暂停"@zh , "Suspended"@en ;
+    skos:notation "suspended" .
+
+## ===========================================================================
+## 与仓库既有 con: 模块的关系（仅为说明，不是可执行三元组）
+##
+## 本仓库的 ontology/domain/domain_contract.owl 已有一套等价词汇。本包使用
+## 独立命名空间，是为了能单独上传 Fuseki / 单独用 Protégé 打开而不产生悬空 IRI；
+## 两者不应同时加载到同一张图（同一实体两个 IRI 会造成静默不匹配）。
+##
+## 若需并入 con: 模块，按下列映射替换前缀即可，语义一一对应：
+##   pay:Contract                 -> con:Contract
+##   pay:PaymentApplication       -> con:PaymentApplication
+##   pay:Invoice                  -> con:Invoice
+##   pay:againstContract          -> con:appliesToContract
+##   pay:hasInvoice               -> con:hasInvoice
+##   pay:appliedAmount            -> con:paymentAmount
+##   pay:status                   -> con:contractStatus（注意 con: 侧用字符串，需按 skos:notation 对齐）
+##   pay:Project / pay:ChangeOrder / pay:belongsToProject / pay:hasContract
+##                                -> con: 侧暂无，需要新增
+## ===========================================================================

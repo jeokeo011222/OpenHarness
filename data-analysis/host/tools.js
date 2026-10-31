@@ -1,16 +1,13 @@
 /** Tool definitions: file, database, and REST imports; the query DSL; computed fields; and charts. */
-import path from 'node:path'
-import { readCsvRows, readFileHead, sniffDelimiter } from './csv.js'
-import { addDerivedColumn, listDatasets, materializeDataset, readDatasetMeta } from './dataset.js'
+import { addDerivedColumn, listDatasets, readDatasetMeta } from './dataset.js'
 import { buildChartSpec, listCharts, saveChart, summarizeChart } from './charts.js'
-import { describeTable, findConnection, listObjects, readTable, runReadOnlyQuery, testConnection } from './database.js'
+import { describeTable, findConnection, listObjects, runReadOnlyQuery, testConnection } from './database.js'
 import { compileExpression } from './expr.js'
-import { assertWithinLimits, normalizeHeaders } from './infer.js'
+import { importApiDataset, importFileDataset, importTableDataset, importWorkbookSheets } from './importers.js'
 import { buildProfile, normalizeQuery, runQuery } from './query.js'
 import { discoverShape, fetchRecords, findSource } from './rest.js'
-import { readXlsx } from './xlsx.js'
-import { AnalysisError, clampInt } from './util.js'
-import { ensureAnalysisDirs, fileFacts, resolveInsideWorkspace, sessionCwd } from './workspace.js'
+import { AnalysisError } from './util.js'
+import { ensureAnalysisDirs, sessionCwd } from './workspace.js'
 
 /**
  * Build a host tool definition without importing the tool SDK.
@@ -47,137 +44,6 @@ function tool(definition) {
       kind: definition.kind ?? 'other',
       rawInput: args,
     }),
-  }
-}
-
-/**
- * Describe a dataset for tool output.
- * @param meta - Dataset metadata.
- * @param warnings - Import warnings.
- * @param preview - Preview rows.
- * @returns The summary the model reads.
- */
-function datasetSummary(meta, warnings, preview) {
-  return {
-    datasetId: meta.id,
-    name: meta.name,
-    version: meta.version,
-    rowCount: meta.rowCount,
-    columnCount: meta.columnCount,
-    source: meta.source,
-    columns: meta.schema.map(entry => ({
-      name: entry.name,
-      type: entry.type,
-      role: entry.role,
-      nullRate: meta.stats?.nullRateByColumn?.[entry.name] ?? 0,
-      distinct: meta.stats?.distinctByColumn?.[entry.name] ?? null,
-      min: meta.stats?.columns?.[entry.name]?.min ?? null,
-      max: meta.stats?.columns?.[entry.name]?.max ?? null,
-      mean: meta.stats?.columns?.[entry.name]?.mean ?? null,
-      p50: meta.stats?.columns?.[entry.name]?.p50 ?? null,
-      p95: meta.stats?.columns?.[entry.name]?.p95 ?? null,
-    })),
-    warnings,
-    preview,
-  }
-}
-
-/**
- * Read the header of a delimited file and prepare a reproducible row factory.
- * @param filePath - Absolute file.
- * @param args - Tool arguments.
- * @returns `{ columns, rowsFactory, warnings, format }`.
- */
-async function prepareCsvSource(filePath, args) {
-  const head = await readFileHead(filePath)
-  const extension = path.extname(filePath).toLowerCase()
-  const delimiter = typeof args.delimiter === 'string' && args.delimiter.length > 0
-    ? args.delimiter
-    : extension === '.tsv'
-      ? '\t'
-      : sniffDelimiter(head)
-  const headerRow = clampInt(args.headerRow, 1, 1000, 1)
-  const warnings = []
-  let header = null
-  let index = 0
-  for await (const row of readCsvRows(filePath, delimiter)) {
-    index += 1
-    if (index === headerRow) {
-      header = row
-      break
-    }
-    if (index >= headerRow) break
-  }
-  if (header === null) throw new AnalysisError(`The file has no header row at line ${headerRow}.`, 'missing_header')
-  const columns = normalizeHeaders(header, warnings)
-  const limitRows = Number.isFinite(args.limitRows) && args.limitRows > 0 ? Math.trunc(args.limitRows) : Infinity
-  let widthWarned = false
-  const rowsFactory = async function* rows() {
-    let line = 0
-    let emitted = 0
-    for await (const row of readCsvRows(filePath, delimiter)) {
-      line += 1
-      if (line <= headerRow) continue
-      if (row.every(cell => String(cell ?? '').trim() === '')) continue
-      if (row.length !== columns.length) {
-        if (!widthWarned) {
-          warnings.push(`Line ${line} has ${row.length} fields but the header has ${columns.length}; values are padded or dropped.`)
-          widthWarned = true
-        }
-        if (row.length < columns.length) while (row.length < columns.length) row.push('')
-        else row.length = columns.length
-      }
-      emitted += 1
-      if (emitted > limitRows) return
-      yield row
-    }
-  }
-  return { columns, rowsFactory, warnings, format: delimiter === '\t' ? 'tsv' : 'csv', delimiter }
-}
-
-/**
- * Read an Excel worksheet and prepare a row factory.
- * @param filePath - Absolute file.
- * @param args - Tool arguments.
- * @returns `{ columns, rowsFactory, warnings, format, sheet }`.
- */
-async function prepareXlsxSource(filePath, args) {
-  const sheets = await readXlsx(filePath)
-  const warnings = []
-  let sheet = sheets[0]
-  if (typeof args.sheet === 'string' && args.sheet.length > 0) {
-    const match = sheets.find(candidate => candidate.name === args.sheet)
-    if (match === undefined) {
-      throw new AnalysisError(`Worksheet "${args.sheet}" was not found. Available sheets: ${sheets.map(candidate => candidate.name).join(', ')}.`, 'missing_sheet')
-    }
-    sheet = match
-  } else {
-    sheet = sheets.find(candidate => candidate.rows.length > 1) ?? sheets[0]
-    if (sheets.length > 1) warnings.push(`Read the first non-empty worksheet "${sheet.name}" of ${sheets.length}.`)
-  }
-  const headerRow = clampInt(args.headerRow, 1, 1000, 1)
-  const header = sheet.rows[headerRow - 1]
-  if (header === undefined) throw new AnalysisError(`Worksheet "${sheet.name}" has no header row at line ${headerRow}.`, 'missing_header')
-  const columns = normalizeHeaders(header, warnings)
-  const dataRows = sheet.rows.slice(headerRow).filter(row => row.some(cell => String(cell ?? '').trim() !== ''))
-  const limitRows = Number.isFinite(args.limitRows) && args.limitRows > 0 ? Math.trunc(args.limitRows) : Infinity
-  for (const row of dataRows) {
-    if (row.length < columns.length) while (row.length < columns.length) row.push('')
-    else row.length = columns.length
-  }
-  return {
-    columns,
-    sheet: sheet.name,
-    format: 'xlsx',
-    warnings,
-    rowsFactory: async function* rows() {
-      let emitted = 0
-      for (const row of dataRows) {
-        emitted += 1
-        if (emitted > limitRows) return
-        yield row
-      }
-    },
   }
 }
 
@@ -246,6 +112,7 @@ export function registerTools(ctx, runtime) {
       'Import a CSV, TSV, or XLSX file from the workspace into a dataset.',
       'The file must sit inside the session workspace; `..` paths and absolute paths outside it are rejected.',
       'The import streams the file twice (schema scan, then write), so 100k+ rows stay in flat memory.',
+      'A workbook can be imported sheet by sheet with `sheets`; each worksheet then becomes its own dataset.',
       'Identical content yields the same dataset id instead of a duplicate.',
     ].join(' '),
     parameters: {
@@ -254,8 +121,16 @@ export function registerTools(ctx, runtime) {
         path: { type: 'string', description: 'Workspace-relative path of the file.' },
         name: { type: 'string', description: 'Display name; defaults to the file name without extension.' },
         sheet: { type: 'string', description: 'XLSX worksheet name; defaults to the first non-empty sheet.' },
+        sheets: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'XLSX worksheets to import as separate datasets; overrides `sheet`. Defaults to every non-empty worksheet.',
+        },
         delimiter: { type: 'string', description: 'CSV delimiter; sniffed from , ; tab | when omitted.' },
-        headerRow: { type: 'integer', description: '1-based header row; defaults to 1.' },
+        headerRow: {
+          type: 'integer',
+          description: '1-based header row; defaults to 1 and folds a stacked second header row (group over field labels) into "group · field" names. Pass a row explicitly to disable that fold.',
+        },
         encoding: { type: 'string', description: 'Only utf-8 is accepted in this version.' },
         limitRows: { type: 'integer', description: 'Debug aid: import at most this many data rows.' },
         force: { type: 'boolean', description: 'Bypass the 1,000,000-row and 200 MB import limits.' },
@@ -265,43 +140,14 @@ export function registerTools(ctx, runtime) {
     /**
      * @param args - Import arguments.
      * @param exec - Execution context.
-     * @returns Dataset summary with preview rows.
+     * @returns Dataset summary with preview rows, or one summary per worksheet.
      */
     async execute(args, exec) {
       const cwd = sessionCwd(exec)
-      if (typeof args.encoding === 'string' && args.encoding.toLowerCase() !== 'utf-8' && args.encoding.toLowerCase() !== 'utf8') {
-        throw new AnalysisError(`Encoding "${args.encoding}" is not supported. Re-save the file as UTF-8.`, 'not_utf8')
-      }
-      const filePath = resolveInsideWorkspace(cwd, args.path)
-      const facts = await fileFacts(filePath)
-      assertWithinLimits(0, facts.sizeBytes, { force: args.force === true })
-      const root = await ensureAnalysisDirs(cwd)
-      const extension = path.extname(filePath).toLowerCase()
-      const isExcel = extension === '.xlsx' || extension === '.xlsm'
-      if (extension === '.xls') throw new AnalysisError('Legacy .xls is not supported; re-save it as .xlsx or CSV.', 'unsupported_format')
-      const source = isExcel ? await prepareXlsxSource(filePath, args) : await prepareCsvSource(filePath, args)
-      const displayName = args.name ?? path.basename(filePath, path.extname(filePath))
-      const result = await materializeDataset(root, {
-        name: displayName,
-        source: {
-          kind: 'file',
-          detail: {
-            path: path.relative(cwd, filePath).split(path.sep).join('/'),
-            format: source.format,
-            ...(source.sheet === undefined ? {} : { sheet: source.sheet }),
-            ...(source.delimiter === undefined ? {} : { delimiter: source.delimiter }),
-            sizeBytes: facts.sizeBytes,
-            mtime: facts.mtime,
-          },
-        },
-        columns: source.columns,
-        rowsFactory: source.rowsFactory,
-        warnings: source.warnings,
-        contentAddress: true,
-        force: args.force === true,
-      })
-      const summary = datasetSummary(result.dataset, result.warnings, result.preview ?? [])
-      return result.reused ? { reused: true, ...summary } : summary
+      // A list of worksheets means "one dataset each"; a bare path keeps the
+      // single-dataset shape the rest of the tools and the panel already read.
+      if (Array.isArray(args.sheets) && args.sheets.length > 0) return importWorkbookSheets(cwd, args)
+      return importFileDataset(cwd, args)
     },
   })
 
@@ -572,24 +418,7 @@ export function registerTools(ctx, runtime) {
     async execute(args, exec) {
       const cwd = sessionCwd(exec)
       const connection = findConnection(connections(), args.connectionId)
-      const limit = clampInt(args.limit, 1, 10_000, 10_000)
-      const table = await readTable(connection, cwd, args.table, limit)
-      if (table.rows.length === 0) throw new AnalysisError(`Table "${args.table}" is empty.`, 'empty_source')
-      const root = await ensureAnalysisDirs(cwd)
-      const columns = table.columns.map(column => column.name)
-      const result = await materializeDataset(root, {
-        name: args.name ?? args.table,
-        source: { kind: 'database', detail: { connectionId: connection.id, table: args.table, kind: connection.kind } },
-        columns,
-        rowsFactory: async function* rows() {
-          for (const row of table.rows) yield row.map(value => (value === null || value === undefined ? '' : String(value)))
-        },
-        warnings: table.truncated ? [`The table was truncated to ${limit} rows.`] : [],
-        contentAddress: false,
-        force: args.force === true,
-      })
-      const summary = datasetSummary(result.dataset, result.warnings, result.preview ?? [])
-      return table.truncated ? { ...summary, warnings: [...summary.warnings, `Table read was capped at ${limit} rows.`] } : summary
+      return importTableDataset(cwd, connection, args)
     },
   })
 
@@ -707,43 +536,7 @@ export function registerTools(ctx, runtime) {
     async execute(args, exec) {
       const cwd = sessionCwd(exec)
       const source = findSource(sources(), args.sourceId)
-      const fetched = await fetchRecords(source, args)
-      if (fetched.records.length === 0) throw new AnalysisError('The API returned no records at the requested path.', 'empty_source')
-      const columns = []
-      const seen = new Set()
-      for (const record of fetched.records) {
-        for (const key of Object.keys(record)) {
-          if (!seen.has(key)) {
-            seen.add(key)
-            columns.push(key)
-          }
-        }
-      }
-      const root = await ensureAnalysisDirs(cwd)
-      const result = await materializeDataset(root, {
-        name: args.name ?? `${source.name ?? source.id} records`,
-        source: {
-          kind: 'api',
-          detail: {
-            sourceId: source.id,
-            path: args.path ?? '',
-            recordsPath: args.recordsPath,
-            pages: fetched.pages,
-            requests: fetched.requests,
-            waterMark: new Date().toISOString(),
-          },
-        },
-        columns,
-        rowsFactory: async function* rows() {
-          for (const record of fetched.records) {
-            yield columns.map(key => (record[key] === null || record[key] === undefined ? '' : String(record[key])))
-          }
-        },
-        warnings: [],
-        contentAddress: false,
-        force: args.force === true,
-      })
-      return datasetSummary(result.dataset, result.warnings, result.preview ?? [])
+      return importApiDataset(cwd, source, args)
     },
   })
 

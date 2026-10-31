@@ -11,9 +11,12 @@ import type { InstanceBatch } from '../types.ts'
 import type {
   ApplyEditsResult,
   AuditEntry,
+  ChunkLibraryStats,
   DomainUpdate,
+  EvidenceChunk,
   GenerateRequest,
   GenerateResult,
+  IngestRequest,
   OntologyDomainSummary,
   OntologyEdit,
   OntologyGraph,
@@ -23,6 +26,8 @@ import type {
   OntologyVersionSummary,
   QualityReport,
   SparqlResult,
+  TraceExample,
+  TraceResult,
   ValidationReport,
 } from '../types.ts'
 
@@ -60,6 +65,16 @@ export interface OntologyStoreFace {
   deleteInstanceBatch(domain: string, batch: string): Promise<RemoteResult<InstanceBatch[]>>
   auditLog(limit?: number): Promise<RemoteResult<AuditEntry[]>>
   health(): Promise<RemoteResult<OntologyHealth>>
+  /** Run one question through the ontology-guided pipeline, returning every stage. */
+  retrievalTrace(domain: string, question: string, topK?: number): Promise<RemoteResult<TraceResult>>
+  /** Clause library statistics for the header badges. */
+  retrievalLibrary(domain: string): Promise<RemoteResult<ChunkLibraryStats>>
+  /** Clause library contents for the evidence table. */
+  retrievalChunks(domain: string, limit?: number): Promise<RemoteResult<EvidenceChunk[]>>
+  /** Import one document as tagged evidence clauses. */
+  retrievalIngest(request: IngestRequest): Promise<RemoteResult<{ docId: string; added: number; total: number }>>
+  /** Demonstration questions shipped with the product. */
+  retrievalExamples(): Promise<RemoteResult<TraceExample[]>>
 }
 
 /** Rejection carrying the Remote error code, so the panel can render one line. */

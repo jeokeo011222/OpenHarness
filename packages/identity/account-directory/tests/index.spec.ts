@@ -127,6 +127,13 @@ function connectionStub(): { peers: PeerRecord[]; stub: never } {
   return { peers, stub }
 }
 
+function settingsStub(): { stub: never } {
+  const stub = {
+    describe(): unknown[] { return [] },
+  } as never
+  return { stub }
+}
+
 function webServerStub(): { routes: Map<string, CapturedRoute>; state: { protocol: 'http:' | 'https:' }; stub: never } {
   const routes = new Map<string, CapturedRoute>()
   const state: { protocol: 'http:' | 'https:' } = { protocol: 'http:' }
@@ -164,11 +171,13 @@ async function setup(options?: {
   const remote = remoteAccessStub()
   const web = webServerStub()
   const connection = connectionStub()
+  const settings = settingsStub()
   ctx.provide('credentials', credentialStore().provider)
   ctx.provide('storageDomain', domain.stub)
   ctx.provide('remoteAccess', remote.stub)
   ctx.provide('webServer', web.stub)
   ctx.provide('connection', connection.stub)
+  ctx.provide('settings', settings.stub)
   await ctx.plugin(AccountDirectory, {
     ...(options?.allowRegistration === undefined ? {} : { allowRegistration: options.allowRegistration }),
     ...(options?.devHint === undefined ? {} : { devHint: options.devHint }),
@@ -558,6 +567,50 @@ describe('grants', () => {
   })
 })
 
+describe('resource dictionary', () => {
+  it('merges declared kinds, catalog labels, and kinds an existing grant names', async () => {
+    const harness = await setup()
+    const bob = await harness.service.register({ username: 'bob', password: PASSWORD })
+    // A kind with an ACL rule but no catalog: it must still be offered, so the
+    // administrator can at least see the kind exists.
+    harness.service.acl.register({ kind: 'declared-only', bind: () => [] })
+    harness.service.catalog.register({
+      kind: 'ontology-domain',
+      label: '本体域',
+      list: async () => [{ id: 'sales', label: '销售域' }, { id: 'ops' }],
+    })
+    await harness.service.setGrant({ userId: bob.id, resourceKind: 'legacy', resourceId: 'old-1', roles: ['viewer'] })
+
+    const dictionary = await harness.service.resourceDictionary()
+    expect(dictionary.kinds.map(entry => entry.kind)).toEqual(['declared-only', 'legacy', 'ontology-domain'])
+    expect(dictionary.kinds.find(entry => entry.kind === 'ontology-domain')?.label).toBe('本体域')
+    expect(dictionary.kinds.find(entry => entry.kind === 'legacy')?.label).toBe('legacy')
+    expect(dictionary.resources['ontology-domain']).toEqual([{ id: 'sales', label: '销售域' }, { id: 'ops' }])
+    // A grant whose kind has no provider still contributes its id, so revoking
+    // it never requires typing the id back in.
+    expect(dictionary.resources.legacy).toEqual([{ id: 'old-1' }])
+    expect(dictionary.resources['declared-only']).toBeUndefined()
+  })
+
+  it('keeps the kind selectable when its provider fails', async () => {
+    const harness = await setup()
+    harness.service.catalog.register({
+      kind: 'broken',
+      list: async () => { throw new Error('store offline') },
+    })
+    const dictionary = await harness.service.resourceDictionary()
+    expect(dictionary.kinds.map(entry => entry.kind)).toEqual(['broken'])
+    expect(dictionary.resources.broken).toEqual([])
+  })
+
+  it('refuses a second dictionary for the same kind', async () => {
+    const harness = await setup()
+    harness.service.catalog.register({ kind: 'doc', list: async () => [] })
+    expect(() => harness.service.catalog.register({ kind: 'doc', list: async () => [] }))
+      .toThrow('already registered')
+  })
+})
+
 describe('ACL registry', () => {
   const READER: RemoteAccessBinding = {
     role: { name: 'test:reader', resource: 'global', actions: ['doc/read'] },
@@ -751,6 +804,87 @@ describe('the administration page', () => {
     const { cookie } = await memberOf(harness, 'root')
     const reply = await callRoute(harness, '/admin', readRequest('/admin', { method: 'POST', headers: signedInRead(cookie) }))
     expect(reply.status).toBe(405)
+  })
+
+  it('offers the resource dictionary as pickers, keeping a typed fallback', async () => {
+    const harness = await setup()
+    const { cookie } = await memberOf(harness, 'root')
+    harness.service.catalog.register({
+      kind: 'ontology-domain',
+      label: '本体域',
+      list: async () => [{ id: 'sales', label: '销售域' }, { id: 'ops' }],
+    })
+    // A kind registered without a provider has no entries; its id must still be
+    // typeable, which is what the text field beside the list is for.
+    harness.service.acl.register({ kind: 'workspace', bind: () => [] })
+
+    const page = await callRoute(harness, '/admin', readRequest('/admin', { headers: signedInRead(cookie) }))
+    expect(page.status).toBe(200)
+    // The kind is a select; the ids are a checkbox list, because one submission
+    // may grant the same roles on several resources at once.
+    expect(page.body).toContain('data-pick="kind"')
+    expect(page.body).toContain('data-pick-list="id"')
+    expect(page.body).toContain('name="resourceId" value="sales"')
+    expect(page.body).toContain('name="resourceId" value="ops"')
+    expect(page.body).toContain('name="resourceIdText"')
+    expect(page.body).toContain('可多选')
+    expect(page.body).not.toContain('<datalist')
+    expect(page.body).not.toContain('list="grant-kinds"')
+    // Kinds carry their label and how many resources they can offer.
+    expect(page.body).toContain('<option value="ontology-domain">本体域（2）</option>')
+    expect(page.body).toContain('<option value="workspace">workspace（0）</option>')
+    // The dictionary reaches the script that repopulates ids when the kind changes.
+    expect(page.body).toContain('var RESOURCE_INDEX =')
+    expect(page.body).toContain('"ontology-domain":[{"id":"sales","label":"销售域"},{"id":"ops"}]')
+    // Every form using it is wired, including the one the dialog clones in.
+    expect(page.body).toContain('data-grant-form')
+    expect(page.body).toContain('wireGrantForm(overlay)')
+  })
+
+  it('wires the create-account button inside the page script, not beside it', async () => {
+    const harness = await setup()
+    const { cookie } = await memberOf(harness, 'root')
+    const page = await callRoute(harness, '/admin', readRequest('/admin', { headers: signedInRead(cookie) }))
+    // `showDialog` lives in the page script's closure. A handler registered from
+    // a second inline script cannot see it, so the click threw and the button
+    // looked dead; both the template and its handler must be inside one script.
+    expect(page.body).toContain('var DIALOG_CREATE=')
+    expect(page.body).toContain("if(createButton) createButton.addEventListener('click', function(){ showDialog(DIALOG_CREATE); });")
+    expect(page.body).not.toContain("document.querySelector('[data-open-create]').addEventListener")
+    expect(page.body.match(/<script>/gu)?.length).toBe(2)
+  })
+
+  it('grants every checked resource id in one submission', async () => {
+    const harness = await setup()
+    const { cookie } = await memberOf(harness, 'root')
+    const bob = await harness.service.register({ username: 'bob', password: PASSWORD })
+    const reply = await callRoute(harness, '/admin/grant/set', formPost('/admin/grant/set', {
+      userId: bob.id,
+      resourceKind: 'ontology-domain',
+      // A checkbox list repeats the field; a duplicate id is granted once.
+      resourceId: ['sales', 'ops', 'sales'],
+      resourceIdText: 'archived，  ops、future',
+      roles: ['viewer'],
+    }, { host: AUTHORITY, origin: `http://${AUTHORITY}`, cookie }))
+    expect(reply.status).toBe(303)
+    expect(harness.service.listGrants()
+      .filter(grant => grant.userId === bob.id)
+      .map(grant => grant.resourceId).sort()).toEqual(['archived', 'future', 'ops', 'sales'])
+  })
+
+  it('refuses a grant submission that names no resource id', async () => {
+    const harness = await setup()
+    const { cookie } = await memberOf(harness, 'root')
+    const bob = await harness.service.register({ username: 'bob', password: PASSWORD })
+    const reply = await callRoute(harness, '/admin/grant/set', formPost('/admin/grant/set', {
+      userId: bob.id,
+      resourceKind: 'ontology-domain',
+      resourceIdText: ' , ， ',
+      roles: ['viewer'],
+    }, { host: AUTHORITY, origin: `http://${AUTHORITY}`, cookie }))
+    expect(reply.status).toBe(400)
+    expect(reply.body).toContain('至少要选择一个资源 ID')
+    expect(harness.service.listGrants()).toEqual([])
   })
 })
 
@@ -948,6 +1082,9 @@ describe('the administrative state route', () => {
     expect(admin.status).toBe(200)
     expect(admin.body).toContain('"accounts":[')
     expect(admin.body).toContain('"grants":[')
+    // The grant form picks resource kinds and ids from this dictionary, so the
+    // state response has to carry it or the form falls back to typed ids.
+    expect(admin.body).toContain('"resources":{"kinds":[')
     expect(admin.body).toContain('"username":"root"')
   })
 
@@ -1123,7 +1260,7 @@ describe('administrative routes', () => {
       [{ userId: bobId, resourceKind: 'doc', resourceId: 'd-1', roles: 'chief' }, 'unknown role'],
       [{ userId: bobId, resourceKind: 'doc', resourceId: 'd-1' }, 'a grant needs at least one role'],
       [{ userId: bobId, resourceId: 'd-1', roles: 'viewer' }, 'a grant needs a resource kind and id'],
-      [{ userId: bobId, resourceKind: 'doc', roles: 'viewer' }, 'a grant needs a resource kind and id'],
+      [{ userId: bobId, resourceKind: 'doc', roles: 'viewer' }, '至少要选择一个资源 ID'],
       [{ resourceKind: 'doc', resourceId: 'd-1', roles: 'viewer' }, 'does not exist'],
     ]
     for (const [fields, fragment] of refusals) {

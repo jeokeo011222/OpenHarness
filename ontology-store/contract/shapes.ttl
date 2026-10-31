@@ -2,23 +2,75 @@
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix contract: <http://example.org/ontology/contract#> .
 
 contract:ContractShape
     a sh:NodeShape ;
     sh:targetClass contract:Contract ;
     sh:property [
-        sh:path contract:contractTitle ;
-        sh:datatype rdf:langString ;
+        sh:path contract:contractId ;
+        sh:datatype xsd:string ;
         sh:minCount 1 ;
         sh:maxCount 1 ;
     ] ;
     sh:property [
+        sh:path contract:contractTitle ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+    ] ;
+    sh:property [
+        sh:path contract:contractAmount ;
+        sh:datatype xsd:decimal ;
+        sh:minInclusive 0 ;
+    ] ;
+    sh:property [
+        sh:path contract:effectiveDate ;
+        sh:datatype xsd:date ;
+        sh:lessThan contract:expiryDate ;
+    ] ;
+    sh:property [
+        sh:path contract:expiryDate ;
+        sh:datatype xsd:date ;
+    ] ;
+    sh:property [
         sh:path contract:hasParty ;
         sh:minCount 2 ;
+    ] ;
+    sh:sparql [
+        sh:message "合同金额不得为负数：{?this} 金额 {?amount}" ;
+        sh:select """
+          SELECT $this ?amount WHERE {
+            $this contract:contractAmount ?amount .
+            FILTER(?amount < 0)
+          }
+        """ ;
+    ] ;
+    sh:sparql [
+        sh:message "生效日期须早于失效日期：{?this} 生效 {?effective} 失效 {?expiry}" ;
+        sh:select """
+          SELECT $this ?effective ?expiry WHERE {
+            $this contract:effectiveDate ?effective ;
+                  contract:expiryDate ?expiry .
+            FILTER(?effective >= ?expiry)
+          }
+        """ ;
     ] .
 
 contract:PartyShape
     a sh:NodeShape ;
     sh:targetClass contract:Party ;
+    sh:property [
+        sh:path contract:partyId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+    ] ;
+    sh:property [
+        sh:path contract:partyName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+    ] ;
     sh:closed false .

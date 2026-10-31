@@ -8,6 +8,8 @@
   },
   "files": [
     "src/types.ts",
+    "src/mention.ts",
+    "src/retrieval/types.ts",
     "src/analytics-types.ts",
     "src/css-modules.d.ts",
     "src/client/index.ts",
@@ -21,13 +23,18 @@
     "src/client/panels.tsx",
     "src/client/AnalyticsPanel.tsx",
     "src/client/VersionsPanel.tsx",
-    "src/client/Workbench.tsx"
+    "src/client/Workbench.tsx",
+    "src/client/RetrievalPanel.tsx",
+    "src/client/mention-draft.ts",
+    "src/client/domain-copy.ts",
+    "src/client/OntologySelector.tsx"
   ],
   "references": [
     { "path": "../../../vendor/cordis" },
     { "path": "../../api/remotes/tsconfig.client.json" },
     { "path": "../../client/locale/tsconfig.client.json" },
     { "path": "../../client/ui-slots" },
+    { "path": "../../client/ui-conversation/tsconfig.client.json" },
     { "path": "../../client/ui-sidebar" }
   ]
 }

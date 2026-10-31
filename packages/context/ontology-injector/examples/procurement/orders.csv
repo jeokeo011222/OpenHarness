@@ -1,0 +1,4 @@
+poNumber,supplierCode,status,amount,region
+PO-1001,SUP-A,pending,6000000,east
+PO-1002,SUP-B,approved,3000000,south
+PO-1003,SUP-A,pending,12000000,east

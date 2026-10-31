@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { IconChevronDownOutlineRegular, Menu, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   AuditEntry,
   OntologyDomainSummary,
@@ -17,9 +18,13 @@ import { messageOf, unwrap, StoreCallError } from './face.ts'
 import { ConfirmDialog } from './ConfirmDialog.tsx'
 import { GraphCanvas } from './GraphCanvas.tsx'
 import { Inspector, type Translate } from './Inspector.tsx'
+import { OntologyIcon } from './OntologyIcon.tsx'
+import { domainRowDescription } from './domain-copy.ts'
 import { AuditPanel, HealthLine, PatchDialog, QualityPanel, SparqlConsole, ValidationPanel } from './panels.tsx'
 import { AnalyticsPanel } from './AnalyticsPanel.tsx'
+import { RetrievalPanel } from './RetrievalPanel.tsx'
 import { VersionsPanel } from './VersionsPanel.tsx'
+import seatCss from './domain-seat.module.css'
 import styles from './workbench.module.css'
 
 /** Largest document the browser forwards to the Host. */
@@ -54,14 +59,15 @@ function downloadText(fileName: string, text: string): void {
 }
 
 /**
- * Three-tab ontology center: the domain list with create/rename/disable
- * actions, the graph workbench with the canvas, the inspector, and the version
- * timeline, and the audit trail. Upload-and-generate lives in the create dialog.
+ * Five-tab ontology center: the domain list with create/rename/disable actions,
+ * the graph workbench with the canvas, inspector and version timeline, the
+ * metric analysis board, the retrieval verification panel, and the audit trail.
+ * Upload-and-generate lives in the create dialog.
  *
  * @param props - Remote face and copy.
  */
 export function Workbench({ store, t }: WorkbenchProps): ReactNode {
-  const [tab, setTab] = useState<'ontologies' | 'graph' | 'analysis' | 'audit'>('ontologies')
+  const [tab, setTab] = useState<'ontologies' | 'graph' | 'analysis' | 'retrieval' | 'audit'>('ontologies')
   const [domains, setDomains] = useState<OntologyDomainSummary[]>([])
   const [activeDomain, setActiveDomain] = useState<string | null>(null)
   const [graph, setGraph] = useState<OntologyGraph | null>(null)
@@ -96,6 +102,8 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
   const [qualityOpen, setQualityOpen] = useState(false)
   /** Side column holds the inspector and version list; collapsing it gives the graph the whole width. */
   const [sideOpen, setSideOpen] = useState(true)
+  /** Scope dropdown in the header, open state only. */
+  const [scopeOpen, setScopeOpen] = useState(false)
 
   const activeSummary = domains.find(item => item.id === activeDomain) ?? null
 
@@ -532,6 +540,22 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
   const graphSignature = graph === null ? '' : `${graph.domain}:${graph.version ?? ''}:${graph.nodes.length}:${graph.edges.length}`
   const versionsSignature = versions.map(item => item.version).join(',')
 
+  // Every tab is scoped to one domain, so the scope is chosen from the header
+  // rather than from the list tab: leaving the current view to change the
+  // domain and coming back is how a page hides its own scope control.
+  const scopeItems: MenuEntry[] = domains.map((domain): MenuEntry => ({
+    id: domain.id,
+    disabled: domain.disabled,
+    label: (
+      <span className={seatCss.item}>
+        <span className={seatCss.itemName}>{domain.label}</span>
+        <span className={seatCss.itemDesc}>
+          {domain.disabled ? t('selectorDisabled') : domainRowDescription(domain, t)}
+        </span>
+      </span>
+    ),
+  }))
+
   return (
     <div className={styles.root}>
       <header className={styles.header}>
@@ -539,9 +563,38 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
           <h1 className={styles.title}>{t('title')}</h1>
           <p className={styles.subtitle}>{t('subtitle')}</p>
         </div>
-        <button type="button" className={styles.button} onClick={() => { void reloadAll() }}>
-          {t('reload')}
-        </button>
+        <div className={styles.headerActions}>
+          {domains.length > 0 && (
+            <Menu
+              open={scopeOpen}
+              onClose={() => { setScopeOpen(false) }}
+              items={scopeItems}
+              selectedId={activeDomain ?? undefined}
+              onSelect={(id) => { setScopeOpen(false); setActiveDomain(id) }}
+              align="end"
+              portal
+              minWidthFromAnchor
+              className={seatCss.anchor}
+              anchor={(
+                <button
+                  type="button"
+                  className={seatCss.seat}
+                  aria-haspopup="menu"
+                  aria-expanded={scopeOpen}
+                  title={activeSummary === null ? t('selectDomain') : domainRowDescription(activeSummary, t)}
+                  onClick={() => { setScopeOpen(value => !value) }}
+                >
+                  <span className={seatCss.seatIcon}><OntologyIcon size={16} /></span>
+                  <span className={seatCss.seatLabel}>{activeSummary?.label ?? t('selectDomain')}</span>
+                  <IconChevronDownOutlineRegular className={seatCss.chevron} />
+                </button>
+              )}
+            />
+          )}
+          <button type="button" className={styles.button} onClick={() => { void reloadAll() }}>
+            {t('reload')}
+          </button>
+        </div>
       </header>
 
       {error !== null && (
@@ -582,6 +635,15 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
         <button
           type="button"
           role="tab"
+          aria-selected={tab === 'retrieval'}
+          className={`${styles.tab}${tab === 'retrieval' ? ` ${styles.tabActive}` : ''}`}
+          onClick={() => { setTab('retrieval') }}
+        >
+          {t('tabRetrieval')}
+        </button>
+        <button
+          type="button"
+          role="tab"
           aria-selected={tab === 'audit'}
           className={`${styles.tab}${tab === 'audit' ? ` ${styles.tabActive}` : ''}`}
           onClick={() => { setTab('audit') }}
@@ -589,6 +651,15 @@ export function Workbench({ store, t }: WorkbenchProps): ReactNode {
           {t('tabAudit')}
         </button>
       </div>
+
+      {tab === 'retrieval' && (
+        <RetrievalPanel
+          store={store}
+          t={t}
+          domain={activeDomain}
+          onNeedDomain={() => { setTab('ontologies') }}
+        />
+      )}
 
       {tab === 'ontologies' && (
         <section className={styles.listBody}>

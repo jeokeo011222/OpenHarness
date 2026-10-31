@@ -1,0 +1,185 @@
+# ---------------------------------------------------------------------------
+# OntoRAG 私有化部署编排（内网可用，无强制外网依赖）
+#
+# 默认栈（测试阶段，3 个容器）：
+#   fuseki    RDF / SPARQL 数据端 —— 图数据仍由它承载，不迁入 pgsql
+#   postgres  PostgreSQL 16 + pgvector —— 分块主数据、向量、审计、租户
+#   backend   FastAPI 编排
+#
+# 备用栈（已有 ES/Milvus 部署时）：docker compose --profile es up -d
+#   该 profile 会额外拉起 elasticsearch / etcd / minio / milvus，
+#   并把 RETRIEVAL_BACKEND 换成 es（见 .env）。
+#
+# 启动：cp .env.example .env && docker compose up -d --build
+# 初始化：docker compose exec backend python /srv/scripts/init_pg.py --tenant demo
+# ---------------------------------------------------------------------------
+
+services:
+  fuseki:
+    image: stain/jena-fuseki:5.1.0
+    container_name: ontorag-fuseki
+    # 镜像入口脚本以 `exec "$@" &` 拉起服务，因此 command 会原样透传
+    command: ["/jena-fuseki/fuseki-server", "--config=/srv/fuseki/ontorag.ttl"]
+    environment:
+      ADMIN_PASSWORD: ${FUSEKI_PASSWORD:-change-me-fuseki}
+      JVM_ARGS: -Xmx2g
+    ports:
+      - "3030:3030"
+    volumes:
+      # 卷挂在 FUSEKI_BASE（/fuseki），不是 /fuseki/databases：
+      # 镜像里只存在 /fuseki 且属主是 fuseki(100)，挂到不存在的子目录会被
+      # Docker 建成 root:root，Fuseki 启动即报 "Not writable: /fuseki/..."。
+      - fuseki-data:/fuseki
+      # 配置文件放在 FUSEKI_BASE 之外：Fuseki 要求 configuration 目录可写，
+      # 把文件挂进去会让 Docker 以 root 建出该目录，同样触发权限报错。
+      - ./deploy/fuseki/ontorag.ttl:/srv/fuseki/ontorag.ttl:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3030/$/ping"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  postgres:
+    # 官方 pgvector 镜像：PostgreSQL 16 已带扩展，免去自行编译
+    image: pgvector/pgvector:pg16
+    container_name: ontorag-pg
+    environment:
+      POSTGRES_USER: ${PG_USER:-ontorag}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-change-me-pg}
+      POSTGRES_DB: ${PG_DATABASE:-ontorag}
+      # 中文语料排序不影响 tsvector（走 simple 配置），但影响 ORDER BY 文本
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-ontorag} -d ${PG_DATABASE:-ontorag}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    container_name: ontorag-backend
+    env_file:
+      # 缺失时只告警不阻断：首次 clone 后没来得及 cp .env.example 也能起栈排查
+      - path: .env
+        required: false
+    environment:
+      # 容器内地址覆盖，避免把宿主地址写进代码
+      FUSEKI_URL: http://fuseki:3030
+      # SHACL 引擎会把待校验数据通过 GSP 写进临时图，必须带管理员账号，
+      # 否则 Fuseki 返回 401，闸门会表现为"校验不可用"。
+      FUSEKI_USER: ${FUSEKI_USER:-admin}
+      FUSEKI_PASSWORD: ${FUSEKI_PASSWORD:-change-me-fuseki}
+      SHACL_BACKEND: ${SHACL_BACKEND:-auto}
+      PG_DSN: postgresql://${PG_USER:-ontorag}:${PG_PASSWORD:-change-me-pg}@postgres:5432/${PG_DATABASE:-ontorag}
+      ONTOLOGY_DIR: /srv/ontology
+      SEED_DIR: /srv/data/seed
+      PG_SCHEMA_PATH: /srv/retrieval/pg/schema.sql
+      AUDIT_DB_PATH: /srv/var/audit.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ontology:/srv/ontology:ro
+      - ./data:/srv/data:ro
+      - ./retrieval:/srv/retrieval:ro
+      - ./scripts:/srv/scripts:ro
+      # 评估集要在容器内可读，否则 eval_accuracy.py 只能回宿主机跑
+      - ./tests:/srv/tests:ro
+      # SQLite 仍保留挂载：memory 模式与历史审计回迁要用
+      - backend-var:/srv/var
+    depends_on:
+      fuseki:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------- 备用栈：仅在 --profile es 时启动 ----------------
+  elasticsearch:
+    profiles: ["es"]
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: ontorag-es
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms1g -Xmx1g
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  etcd:
+    profiles: ["es"]
+    image: quay.io/coreos/etcd:v3.5.14
+    container_name: ontorag-etcd
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    command: >-
+      etcd -advertise-client-urls=http://127.0.0.1:2379
+      -listen-client-urls=http://0.0.0.0:2379
+      --data-dir /etcd
+    volumes:
+      - etcd-data:/etcd
+    restart: unless-stopped
+
+  minio:
+    profiles: ["es"]
+    image: minio/minio:RELEASE.2024-05-10T01-41-38Z
+    container_name: ontorag-minio
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+    command: minio server /minio_data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/minio_data
+    restart: unless-stopped
+
+  milvus:
+    profiles: ["es"]
+    image: milvusdb/milvus:v2.4.9
+    container_name: ontorag-milvus
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    volumes:
+      - milvus-data:/var/lib/milvus
+    depends_on:
+      - etcd
+      - minio
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9091/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  fuseki-data:
+  pg-data:
+  backend-var:
+  es-data:
+  etcd-data:
+  minio-data:
+  milvus-data:

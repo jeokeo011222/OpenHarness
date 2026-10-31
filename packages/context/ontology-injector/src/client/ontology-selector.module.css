@@ -1,0 +1,20 @@
+/* The composer's ontology row. The seat itself lives in domain-seat.module.css,
+   shared with the ontology center's scope seat so the two pickers cannot drift
+   apart. */
+
+/* The dock stack is full width and every item aligns itself to the composer
+   card, so this row carries the card's own geometry: the seat's left edge then
+   sits on the input card's left edge instead of out at the stack edge. The
+   fallbacks keep the row usable where the host variables are absent (the row
+   simply stays full width, which is where it started). */
+.row {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - 2 * var(--dsh-composer-side-clearance, 16px));
+  max-width: var(--dsh-composer-card-max-width, 100%);
+  min-width: 0;
+  margin: 0 auto;
+}

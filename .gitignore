@@ -47,4 +47,7 @@ worktrees/
 .agents/worktrees/
 .typert-*/
 ontology-store/graph.db.nq
+ontology-store/objects.db
+ontology-store/objects.db-shm
+ontology-store/objects.db-wal
 native/system/test/bin/

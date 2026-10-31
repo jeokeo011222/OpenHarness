@@ -449,6 +449,50 @@ describe('session.create reuse of a live blank Session', () => {
   })
 })
 
+describe('Agent activation of a stored Session that already ran', () => {
+  it('resumes under the default when its recorded preset is no longer declared', async () => {
+    const talk = SessionId('stale-talk')
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-session-preset-stored-')))
+    tempDirs.push(cwd)
+    const { ctx, resumed, presetOf } = await harness({
+      presets: ['standard', 'minimal'],
+      stored: new Map([[talk, {
+        header: storedHeader(talk, cwd, { agentPreset: 'computer-use' }),
+        events: [presetSelection(0, 'computer-use'), ...completedTurn(1)],
+      }]]),
+    })
+
+    const resolved = await ctx.sessionController.resolveAgent(talk)
+
+    // The alternative is a conversation nobody can reopen: the roster refuses
+    // the preset, and the resume is the only way back into its history.
+    expect('error' in resolved).toBe(false)
+    expect(resumed).toEqual(['stale-talk'])
+    // The durable record keeps naming what the Session ran; only this
+    // activation composes the default.
+    expect(presetOf(talk)).toBe('computer-use')
+  })
+
+  it('resumes under its recorded preset while the roster still declares it', async () => {
+    const talk = SessionId('declared-talk')
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-session-preset-stored-')))
+    tempDirs.push(cwd)
+    const { ctx, resumed, presetOf } = await harness({
+      presets: ['standard', 'minimal'],
+      stored: new Map([[talk, {
+        header: storedHeader(talk, cwd, { agentPreset: 'minimal' }),
+        events: [presetSelection(0, 'minimal'), ...completedTurn(1)],
+      }]]),
+    })
+
+    const resolved = await ctx.sessionController.resolveAgent(talk)
+
+    expect('error' in resolved).toBe(false)
+    expect(resumed).toEqual(['declared-talk'])
+    expect(presetOf(talk)).toBe('minimal')
+  })
+})
+
 describe('session.create reuse of a stored blank Session', () => {
   it('resumes a blank Session whose recorded preset is no longer declared under the default', async () => {
     const draft = SessionId('stale-draft')

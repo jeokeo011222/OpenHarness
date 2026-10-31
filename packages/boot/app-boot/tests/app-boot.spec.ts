@@ -393,6 +393,25 @@ describe('installFailLoud', () => {
     expect(proc.exits).toEqual([1])
   })
 
+  it('hands the reported failure to an exit recorder before the terminal write', () => {
+    const proc = fakeProc()
+    const recorded: { label: string; error: unknown }[] = []
+    installFailLoud(NAME, proc, undefined, (failure) => { recorded.push({ ...failure }) })
+    const error = new Error('recorded without a terminal')
+    proc.exception(error)
+    expect(recorded).toEqual([{ label: 'fatal uncaught exception', error }])
+    expect(proc.written).toHaveLength(1)
+    expect(proc.exits).toEqual([1])
+  })
+
+  it('still fails loudly when the exit recorder throws', () => {
+    const proc = fakeProc()
+    installFailLoud(NAME, proc, undefined, () => { throw new Error('log unavailable') })
+    proc.rejection(new Error('boom'))
+    expect(proc.written[0]).toContain(`${NAME}: fatal load failure: `)
+    expect(proc.exits).toEqual([1])
+  })
+
   // One rejection is reported per install: the first is the diagnosis, so each
   // formatting case needs its own handler rather than reusing a latched one.
   it('stringifies a non-Error rejection and an Error without a stack falls back to its message', () => {

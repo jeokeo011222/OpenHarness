@@ -18,8 +18,9 @@ import type { ConnectionIdentity, ConnectionTrustRequest } from '@deepseek-ai/ds
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
 import type { PeerScope } from '@deepseek-ai/dsh-typert-protocol'
+import type {} from '@deepseek-ai/dsh-settings'
 import { crossesOrigin, readForm, redirect, sendHtml, sendJson } from './http.ts'
-import { adminPage, loginPage } from './pages.ts'
+import { adminPage, loginPage, type ThemePreference } from './pages.ts'
 import { hashPassword, verifyPassword } from './password.ts'
 import {
   LOGIN_PATH,
@@ -32,11 +33,26 @@ import {
   submittedCookie,
 } from './session.ts'
 import { accountDomainSpec, ACCOUNT_ROLES, grantKey, type GrantKey, type StoredGrant, type StoredUser } from './spec.ts'
-import type { AccountAcl, AccountAclRule, AccountRole, AccountSummary, GrantRecord, GlobalRole, UserId } from './types.ts'
+import type {
+  AccountAcl,
+  AccountAclRule,
+  AccountResourceCatalog,
+  AccountResourceDictionary,
+  AccountResourceSource,
+  AccountRole,
+  AccountSummary,
+  GrantRecord,
+  GlobalRole,
+  UserId,
+} from './types.ts'
 
 export type {
   AccountAcl,
   AccountAclRule,
+  AccountResourceCatalog,
+  AccountResourceDictionary,
+  AccountResourceEntry,
+  AccountResourceSource,
   AccountRole,
   AccountSummary,
   GrantRecord,
@@ -55,8 +71,8 @@ declare module '@deepseek-ai/cordis' {
 /** Plugin name. */
 export const name = 'account-directory'
 
-/** Services the directory needs: durable records, access policy, HTTP surface, and Peer admission. */
-export const inject = ['credentials', 'storageDomain', 'remoteAccess', 'webServer', 'connection']
+/** Services the directory needs: durable records, access policy, HTTP surface, Peer admission, and settings read for theme preference. */
+export const inject = ['credentials', 'storageDomain', 'remoteAccess', 'webServer', 'connection', 'settings']
 
 /** Account-directory configuration. */
 export interface Config {
@@ -80,6 +96,33 @@ export const Config: z<Config> = z.object({
 
 const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{1,63}$/u
 const DAY_MS = 86_400_000
+
+/** Ceiling on the resource ids one grant submission may carry, so one POST cannot fan out without bound. */
+const MAX_GRANT_IDS = 200
+
+/** Separators a typed id list may use: ASCII comma, full-width comma, enumeration comma, or whitespace. */
+const GRANT_ID_SEPARATOR = /[,，、\s]+/u
+
+/**
+ * Read the resource ids one grant form submitted.
+ *
+ * The id picker is a checkbox list, so a batch arrives as repeated `resourceId`
+ * fields; the typed fallback adds `resourceIdText`, which accepts a separated
+ * list. Ids are trimmed, de-duplicated in submission order, and capped.
+ * @param form - Decoded form body.
+ * @returns Unique non-empty ids, in the order they were submitted.
+ */
+function grantIds(form: URLSearchParams): string[] {
+  const typed = (form.get('resourceIdText') ?? '').split(GRANT_ID_SEPARATOR)
+  const ids: string[] = []
+  for (const raw of [...form.getAll('resourceId'), ...typed]) {
+    const id = raw.trim()
+    if (id === '' || ids.includes(id)) continue
+    ids.push(id)
+    if (ids.length >= MAX_GRANT_IDS) break
+  }
+  return ids
+}
 
 /** Name one requested account change the directory cannot apply. */
 export class AccountDirectoryError extends Error {
@@ -127,12 +170,16 @@ export class AccountDirectory extends Service {
   /** Registry business packages contribute their grant rules to. */
   readonly acl: AccountAcl
 
+  /** Registry business packages contribute their resource dictionaries to. */
+  readonly catalog: AccountResourceCatalog
+
   private readonly settings: Required<Omit<Config, 'devHint'>> & { readonly devHint?: Config['devHint'] | undefined }
   private readonly users = new Map<UserId, StoredUser>()
   private readonly usernames = new Map<string, UserId>()
   private readonly grants = new Map<GrantKey, StoredGrant>()
   private readonly grantsByUser = new Map<UserId, Set<GrantKey>>()
   private readonly rules = new Map<string, AccountAclRule>()
+  private readonly catalogs = new Map<string, AccountResourceSource>()
   private readonly baselines = new Set<(userId: UserId) => readonly RemoteAccessBinding[]>()
   private readonly peers = new Map<UserId, PeerScope>()
   private readonly identity: ConnectionIdentity
@@ -159,6 +206,9 @@ export class AccountDirectory extends Service {
       register: rule => this.registerRule(rule),
       registerBaseline: bindings => this.registerBaseline(bindings),
     }
+    this.catalog = {
+      register: source => this.registerCatalog(source),
+    }
     this.identity = {
       loginPath: LOGIN_PATH,
       peerFor: request => this.peerFor(request),
@@ -168,6 +218,15 @@ export class AccountDirectory extends Service {
       this.peers.clear()
       await Promise.all(peers.map(peer => peer.dispose()))
     }, 'account-directory: account Peers')
+  }
+
+  /** Read the current app appearance preference from the Host settings document. */
+  private get themePreference(): ThemePreference {
+    const descriptor = this.ctx.settings.describe().find(d => d.ns === 'ui-theme')
+    const value = descriptor?.value as { preference?: unknown } | undefined
+    const pref = value?.preference
+    if (pref === 'light' || pref === 'dark' || pref === 'system') return pref
+    return 'system'
   }
 
   /** Open the account domain, load its records, and publish the policy and HTTP surface. */
@@ -469,16 +528,66 @@ export class AccountDirectory extends Service {
     return () => { void dispose() }
   }
 
-  private registerBaseline(bindings: (userId: UserId) => readonly RemoteAccessBinding[]): () => void {
+  private registerCatalog(source: AccountResourceSource): () => void {
     const dispose = this.ctx.effect(() => {
-      this.baselines.add(bindings)
-      this.invalidateAll()
-      return () => {
-        this.baselines.delete(bindings)
-        this.invalidateAll()
+      if (this.catalogs.has(source.kind)) {
+        throw new Error(`account-directory: resource dictionary for kind ${JSON.stringify(source.kind)} is already registered`)
       }
-    }, 'account-directory: ACL baseline')
+      this.catalogs.set(source.kind, source)
+      return () => {
+        this.catalogs.delete(source.kind)
+      }
+    }, `account-directory: resource dictionary ${source.kind}`)
     return () => { void dispose() }
+  }
+
+  /**
+   * The dictionary the permission form renders: every kind a package declared,
+   * every kind an existing grant names, and the ids behind each of them.
+   *
+   * Kinds are merged rather than trusted to the providers alone, because a
+   * grant can outlive the package that declared its kind; the form must still
+   * show that kind so the grant stays visible and revocable. A provider that
+   * throws is skipped instead of failing the whole admin page.
+   * @returns kind descriptors and, per kind, the ids an administrator can pick.
+   */
+  async resourceDictionary(): Promise<AccountResourceDictionary> {
+    const labels = new Map<string, string>()
+    for (const kind of this.rules.keys()) labels.set(kind, kind)
+    for (const [kind, source] of this.catalogs) labels.set(kind, source.label ?? kind)
+    for (const grant of this.grants.values()) if (!labels.has(grant.resourceKind)) labels.set(grant.resourceKind, grant.resourceKind)
+
+    const resources: Record<string, { id: string; label?: string }[]> = {}
+    for (const [kind, source] of this.catalogs) {
+      try {
+        const listed = await source.list()
+        resources[kind] = listed.map(entry => ({ id: entry.id, ...(entry.label === undefined ? {} : { label: entry.label }) }))
+      } catch {
+        // The page is a permission form, not a health monitor: an unreachable
+        // provider still leaves the kind selectable with manually typed ids.
+        resources[kind] = []
+      }
+    }
+    // Ids already granted stay pickable even when no provider enumerates them.
+    for (const grant of this.grants.values()) {
+      const list = resources[grant.resourceKind] ?? (resources[grant.resourceKind] = [])
+      if (!list.some(entry => entry.id === grant.resourceId)) list.push({ id: grant.resourceId })
+    }
+
+    const kinds = Array.from(labels, ([kind, label]) => ({ kind, label, count: resources[kind]?.length ?? 0 }))
+      .sort((left, right) => left.kind.localeCompare(right.kind))
+    return { kinds, resources }
+  }
+
+  private registerBaseline(bindings: (userId: UserId) => readonly RemoteAccessBinding[]): () => void {    const dispose = this.ctx.effect(() => {
+    this.baselines.add(bindings)
+    this.invalidateAll()
+    return () => {
+      this.baselines.delete(bindings)
+      this.invalidateAll()
+    }
+  }, 'account-directory: ACL baseline')
+  return () => { void dispose() }
   }
 
   private invalidate(userId: UserId): void {
@@ -616,8 +725,8 @@ export class AccountDirectory extends Service {
   private registerRoutes(): () => void {
     const routes = [
       this.ctx.webServer.register({ kind: 'exact', path: LOGIN_PATH, handler: (req, res) => { this.serveLogin(req, res) } }),
-      this.ctx.webServer.register({ kind: 'exact', path: '/admin', handler: (req, res) => { this.serveAdmin(req, res) } }),
-      this.ctx.webServer.register({ kind: 'exact', path: '/admin/state', handler: (req, res) => { this.handleAdminState(req, res) } }),
+      this.ctx.webServer.register({ kind: 'exact', path: '/admin', handler: (req, res) => { void this.serveAdmin(req, res) } }),
+      this.ctx.webServer.register({ kind: 'exact', path: '/admin/state', handler: (req, res) => { void this.handleAdminState(req, res) } }),
       this.ctx.webServer.register({ kind: 'exact', path: '/auth/login', handler: (req, res) => { this.handleLogin(req, res) } }),
       this.ctx.webServer.register({ kind: 'exact', path: '/auth/register', handler: (req, res) => { this.handleRegister(req, res) } }),
       this.ctx.webServer.register({ kind: 'exact', path: '/auth/logout', handler: (req, res) => { this.handleLogout(req, res) } }),
@@ -634,25 +743,26 @@ export class AccountDirectory extends Service {
   private serveLogin(req: IncomingMessage, res: ServerResponse): void {
     if (!this.isReadSafe(req)) { res.writeHead(405); res.end(); return }
     const url = new URL(req.url ?? '/', 'http://localhost')
-    sendHtml(res, 200, loginPage(url.searchParams.get('message') ?? undefined, this.canRegister(), this.settings.devHint))
+    sendHtml(res, 200, loginPage(url.searchParams.get('message') ?? undefined, this.canRegister(), this.settings.devHint, this.themePreference))
   }
 
-  private serveAdmin(req: IncomingMessage, res: ServerResponse): void {
+  private async serveAdmin(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (!this.isReadSafe(req)) { res.writeHead(405); res.end(); return }
     const account = this.sessionAccount(req)
     if (account === undefined) { redirect(res, LOGIN_PATH); return }
-    if (!account.roles.includes('admin')) { sendHtml(res, 403, loginPage('该账号不是管理员', false)); return }
+    if (!account.roles.includes('admin')) { sendHtml(res, 403, loginPage('该账号不是管理员', false, undefined, this.themePreference)); return }
     const url = new URL(req.url ?? '/', 'http://localhost')
-    sendHtml(res, 200, adminPage(account, this.listAccounts(), this.listGrants(), url.searchParams.get('message') ?? undefined))
+    const dictionary = await this.resourceDictionary()
+    sendHtml(res, 200, adminPage(account, this.listAccounts(), this.listGrants(), url.searchParams.get('message') ?? undefined, this.themePreference, dictionary))
   }
 
   private handleLogin(req: IncomingMessage, res: ServerResponse): void {
     void this.submitPublic(req, res, async () => {
       const form = await readForm(req)
       const account = await this.authenticate(form.get('username') ?? '', form.get('password') ?? '')
-      if (account === undefined) return loginPage('用户名或密码错误', this.canRegister(), this.settings.devHint)
+      if (account === undefined) return loginPage('用户名或密码错误', this.canRegister(), this.settings.devHint, this.themePreference)
       const authority = this.authority(req, this.secure)
-      if (authority === undefined) return loginPage('无法解析请求地址', false)
+      if (authority === undefined) return loginPage('无法解析请求地址', false, undefined, this.themePreference)
       redirect(res, '/', [this.sessionCookieFor(account.id, authority, this.secure)])
       return undefined
     })
@@ -668,7 +778,7 @@ export class AccountDirectory extends Service {
         ...(displayName === null || displayName.trim() === '' ? {} : { displayName }),
       })
       const authority = this.authority(req, this.secure)
-      if (authority === undefined) return loginPage('无法解析请求地址', false)
+      if (authority === undefined) return loginPage('无法解析请求地址', false, undefined, this.themePreference)
       redirect(res, '/', [this.sessionCookieFor(account.id, authority, this.secure)])
       return undefined
     })
@@ -693,13 +803,16 @@ export class AccountDirectory extends Service {
     })
   }
 
-  /** JSON state for the client workbench: the caller's account plus every account and grant. */
-  private handleAdminState(req: IncomingMessage, res: ServerResponse): void {
+  /** JSON state for the client workbench: the caller's account, every account and grant, and the resource dictionary the grant form picks from. */
+  private async handleAdminState(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (!this.isReadSafe(req)) { res.writeHead(405); res.end(); return }
     const account = this.sessionAccount(req)
     if (account === undefined) { sendJson(res, 401, { error: 'sign-in required' }); return }
     if (!account.roles.includes('admin')) { sendJson(res, 403, { error: '该接口仅管理员可用' }); return }
-    sendJson(res, 200, { account, accounts: this.listAccounts(), grants: this.listGrants() })
+    // The dictionary is read after the same admission check as the accounts, so
+    // an authenticated-but-unauthorized caller learns nothing about resources.
+    const resources = await this.resourceDictionary()
+    sendJson(res, 200, { account, accounts: this.listAccounts(), grants: this.listGrants(), resources })
   }
 
   private handleUserCreate(req: IncomingMessage, res: ServerResponse): void {
@@ -741,12 +854,15 @@ export class AccountDirectory extends Service {
   private handleGrantSet(req: IncomingMessage, res: ServerResponse): void {
     void this.submitAdmin(req, res, async () => {
       const form = await readForm(req)
-      await this.setGrant({
-        userId: brandString<UserId>(form.get('userId') ?? ''),
-        resourceKind: form.get('resourceKind') ?? '',
-        resourceId: form.get('resourceId') ?? '',
-        roles: form.getAll('roles'),
-      })
+      const resourceKind = form.get('resourceKind') ?? ''
+      const resourceIds = grantIds(form)
+      if (resourceIds.length === 0) throw new AccountDirectoryError('invalid-role', '至少要选择一个资源 ID')
+      const userId = brandString<UserId>(form.get('userId') ?? '')
+      const roles = form.getAll('roles')
+      // One submission may cover a batch: every chosen id gets the same roles.
+      // A failure on any id surfaces before the redirect, so a partially applied
+      // batch is never reported as success.
+      for (const resourceId of resourceIds) await this.setGrant({ userId, resourceKind, resourceId, roles })
       redirect(res, '/admin')
     })
   }
@@ -769,12 +885,12 @@ export class AccountDirectory extends Service {
     action: () => Promise<string | undefined>,
   ): Promise<void> {
     if (req.method !== 'POST') { res.writeHead(405); res.end(); return }
-    if (crossesOrigin(req, this.secure)) { sendHtml(res, 403, loginPage('跨站请求被拒绝', false)); return }
+    if (crossesOrigin(req, this.secure)) { sendHtml(res, 403, loginPage('跨站请求被拒绝', false, undefined, this.themePreference)); return }
     try {
       const page = await action()
       if (page !== undefined) sendHtml(res, 400, page)
     } catch (error) {
-      sendHtml(res, 400, loginPage(error instanceof Error ? error.message : '操作失败', this.canRegister()))
+      sendHtml(res, 400, loginPage(error instanceof Error ? error.message : '操作失败', this.canRegister(), undefined, this.themePreference))
     }
   }
 
@@ -784,15 +900,15 @@ export class AccountDirectory extends Service {
     action: (account: AccountSummary) => Promise<void>,
   ): Promise<void> {
     if (req.method !== 'POST') { res.writeHead(405); res.end(); return }
-    if (crossesOrigin(req, this.secure)) { sendHtml(res, 403, loginPage('跨站请求被拒绝', false)); return }
+    if (crossesOrigin(req, this.secure)) { sendHtml(res, 403, loginPage('跨站请求被拒绝', false, undefined, this.themePreference)); return }
     const account = this.sessionAccount(req)
     if (account === undefined) { redirect(res, LOGIN_PATH); return }
-    if (!account.roles.includes('admin')) { sendHtml(res, 403, loginPage('该账号不是管理员', false)); return }
+    if (!account.roles.includes('admin')) { sendHtml(res, 403, loginPage('该账号不是管理员', false, undefined, this.themePreference)); return }
     try {
       await action(account)
     } catch (error) {
       const message = error instanceof Error ? error.message : '账号操作失败'
-      sendHtml(res, 400, adminPage(account, this.listAccounts(), this.listGrants(), message))
+      sendHtml(res, 400, adminPage(account, this.listAccounts(), this.listGrants(), message, this.themePreference))
     }
   }
 

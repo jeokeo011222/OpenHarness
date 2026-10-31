@@ -6,7 +6,6 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { AccountMenu } from './AccountMenu.tsx'
-import { AdminIcon } from './AdminIcon.tsx'
 import { AdminWorkbench } from './AdminWorkbench.tsx'
 import { fetchLocalAccount, isAdminState } from './local-admin.ts'
 import { de, en, es, fr, ja, pt, ru, zh, type AccountKey } from './locales.ts'
@@ -29,8 +28,9 @@ export function apply(ctx: Context): void {
   ctx.slots.inject('settings.launcher', () => ctx.slots.register({
     name: 'settings.launcher', locale: 'settings.account',
   }, AccountMenu))
-  // The sidebar workbench is an administrator affordance; the local session is
-  // browser state, so one probe per mount decides whether the row registers.
+  // The admin workbench is an administrator affordance: no sidebar panel row
+  // (users reach it through the bottom user menu in AccountMenu), just the
+  // main-slot page for the `/admin` route.
   ctx.effect(() => {
     let unregister: (() => void) | undefined
     let live = true
@@ -41,11 +41,7 @@ export function apply(ctx: Context): void {
         name: 'main', key: ADMIN_PANEL_ID, locale: 'settings.account',
         inject: () => ({ t }),
       }, AdminWorkbench))
-      const disposeRow = ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
-        name: 'sidebar.panellist', id: ADMIN_PANEL_ID, order: 95, locale: 'settings.account',
-        label: () => t('userManagement'),
-      }, AdminIcon))
-      unregister = () => { disposeMain(); disposeRow() }
+      unregister = () => { disposeMain() }
     })
     return () => { live = false; unregister?.() }
   }, 'account: admin workbench')

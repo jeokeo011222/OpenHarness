@@ -6,6 +6,25 @@ export interface LocalAccountState {
   readonly account?: { readonly username: string; readonly displayName: string; readonly roles: readonly string[] }
 }
 
+/** One resource kind the grant form offers, with how many ids it can list. */
+export interface LocalAdminResourceKind {
+  readonly kind: string
+  readonly label: string
+  readonly count?: number
+}
+
+/** One resource id inside a kind. */
+export interface LocalAdminResourceEntry {
+  readonly id: string
+  readonly label?: string
+}
+
+/** The dictionary the permission form picks resource kinds and ids from. */
+export interface LocalAdminResourceDictionary {
+  readonly kinds: readonly LocalAdminResourceKind[]
+  readonly resources: Readonly<Record<string, readonly LocalAdminResourceEntry[]>>
+}
+
 /** Narrow shape of the account-directory `/admin/state` response the workbench consumes. */
 export interface LocalAdminState {
   readonly account: { readonly username: string; readonly displayName: string; readonly roles: readonly string[] }
@@ -21,6 +40,8 @@ export interface LocalAdminState {
     readonly resourceId: string
     readonly roles: readonly string[]
   }[]
+  /** Resource dictionary; absent on a Host that predates it. */
+  readonly resources?: LocalAdminResourceDictionary
 }
 
 /** Whether one parsed session state carries the global admin role. */
@@ -83,7 +104,22 @@ function isAdminShape(state: unknown): state is LocalAdminState {
   if (typeof state !== 'object' || state === null) return false
   const candidate = state as Record<string, unknown>
   if (!isAccount(candidate.account) || !Array.isArray(candidate.accounts) || !Array.isArray(candidate.grants)) return false
+  if (candidate.resources !== undefined && !isResourceDictionary(candidate.resources)) return false
   return candidate.accounts.every(isAccountRecord) && candidate.grants.every(isGrantRecord)
+}
+
+/** Type guard for the resource dictionary; a malformed one reads as absent. */
+function isResourceDictionary(value: unknown): value is LocalAdminResourceDictionary {
+  if (typeof value !== 'object' || value === null) return false
+  const candidate = value as Record<string, unknown>
+  if (!Array.isArray(candidate.kinds)) return false
+  const resources = candidate.resources
+  if (typeof resources !== 'object' || resources === null) return false
+  const kindsOk = candidate.kinds.every(entry => typeof entry === 'object' && entry !== null
+    && typeof (entry as Record<string, unknown>).kind === 'string')
+  if (!kindsOk) return false
+  return Object.values(resources).every(list => Array.isArray(list)
+    && list.every(entry => typeof entry === 'object' && entry !== null && typeof entry.id === 'string'))
 }
 
 function isAccount(value: unknown): value is LocalAdminState['account'] {

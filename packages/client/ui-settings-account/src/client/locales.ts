@@ -11,6 +11,7 @@ export const en = {
   adminTitle: 'User management',
   adminDescription: 'Accounts and resource grants of this deployment.',
   adminTabUsers: 'Users',
+  adminTabPermissions: 'Permissions',
   adminTabRoles: 'Roles',
   adminAddUser: 'Add user',
   adminEdit: 'Edit',
@@ -40,6 +41,10 @@ export const en = {
   adminDelete: 'Delete',
   adminResourceKind: 'Resource kind',
   adminResourceId: 'Resource id',
+  adminResourceCustom: 'Custom…',
+  adminResourcePickKind: 'Choose a kind',
+  adminResourcePickId: 'Choose a resource',
+  adminResourceNoIds: 'This kind has no listed resources; type an id instead.',
   adminRoles: 'Roles',
   adminGrantTo: 'Account',
   adminSetGrant: 'Set grant',
@@ -47,6 +52,9 @@ export const en = {
   adminForbidden: 'This page is only available to administrators.',
   adminError: 'The request failed. Reload the page and try again.',
   adminEmpty: 'Nothing here yet.',
+  adminPermissions: 'Permissions',
+  adminUserPermissions: 'Permissions for "{name}"',
+  adminNoGrants: 'This user has no resource grants.',
 } as const
 /** Account locale keys. */
 export type AccountKey = keyof typeof en
@@ -61,6 +69,7 @@ export const zh: Record<AccountKey, string> = {
   adminTitle: '用户管理',
   adminDescription: '管理本部署的账号与资源授权。',
   adminTabUsers: '用户列表',
+  adminTabPermissions: '权限',
   adminTabRoles: '角色',
   adminAddUser: '新增用户',
   adminEdit: '编辑',
@@ -90,6 +99,10 @@ export const zh: Record<AccountKey, string> = {
   adminDelete: '删除',
   adminResourceKind: '资源类型',
   adminResourceId: '资源标识',
+  adminResourceCustom: '自定义…',
+  adminResourcePickKind: '选择资源类型',
+  adminResourcePickId: '选择资源',
+  adminResourceNoIds: '这个类型暂无可选资源，请手动填写。',
   adminRoles: '角色',
   adminGrantTo: '账号',
   adminSetGrant: '设置授权',
@@ -97,6 +110,9 @@ export const zh: Record<AccountKey, string> = {
   adminForbidden: '该页面仅管理员可用。',
   adminError: '请求失败，请刷新页面重试。',
   adminEmpty: '暂无内容。',
+  adminPermissions: '权限',
+  adminUserPermissions: '“{name}” 的资源权限',
+  adminNoGrants: '该用户当前没有任何资源授权。',
 }
 
 /** Japanese copy, checked against the English keys. */
@@ -110,6 +126,7 @@ export const ja = {
   'adminTitle': 'ユーザー管理',
   'adminDescription': 'このデプロイのアカウントとリソース権限を管理します。',
   'adminTabUsers': 'ユーザー一覧',
+  'adminTabPermissions': '権限',
   'adminTabRoles': 'ロール',
   'adminAddUser': 'ユーザーを追加',
   'adminEdit': '編集',
@@ -139,6 +156,10 @@ export const ja = {
   'adminDelete': '削除',
   'adminResourceKind': 'リソース種別',
   'adminResourceId': 'リソース ID',
+  'adminResourceCustom': 'カスタム…',
+  'adminResourcePickKind': 'リソース種別を選択',
+  'adminResourcePickId': 'リソースを選択',
+  'adminResourceNoIds': 'この種別に選択肢はありません。ID を入力してください。',
   'adminRoles': 'ロール',
   'adminGrantTo': 'アカウント',
   'adminSetGrant': '権限を設定',
@@ -146,6 +167,9 @@ export const ja = {
   'adminForbidden': 'このページは管理者のみ利用できます。',
   'adminError': 'リクエストに失敗しました。ページを再読み込みして再試行してください。',
   'adminEmpty': 'まだ何もありません。',
+  'adminPermissions': '権限',
+  'adminUserPermissions': '「{name}」の権限',
+  'adminNoGrants': 'このユーザーにはリソース権限がありません。',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
@@ -159,6 +183,7 @@ export const es = {
   adminTitle: 'Gestión de usuarios',
   adminDescription: 'Cuentas y permisos de recursos de este despliegue.',
   adminTabUsers: 'Usuarios',
+  adminTabPermissions: 'Permisos',
   adminTabRoles: 'Roles',
   adminAddUser: 'Añadir usuario',
   adminEdit: 'Editar',
@@ -188,6 +213,10 @@ export const es = {
   adminDelete: 'Eliminar',
   adminResourceKind: 'Tipo de recurso',
   adminResourceId: 'Identificador del recurso',
+  adminResourceCustom: 'Personalizado…',
+  adminResourcePickKind: 'Elija un tipo',
+  adminResourcePickId: 'Elija un recurso',
+  adminResourceNoIds: 'Este tipo no lista recursos; escriba un ID.',
   adminRoles: 'Roles',
   adminGrantTo: 'Cuenta',
   adminSetGrant: 'Establecer permiso',
@@ -195,6 +224,9 @@ export const es = {
   adminForbidden: 'Esta página solo está disponible para administradores.',
   adminError: 'La solicitud falló. Recargue la página e inténtelo de nuevo.',
   adminEmpty: 'Aún no hay nada.',
+  adminPermissions: 'Permisos',
+  adminUserPermissions: 'Permisos de «{name}»',
+  adminNoGrants: 'Este usuario no tiene permisos de recursos.',
 } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
@@ -208,6 +240,7 @@ export const fr = {
   adminTitle: 'Gestion des utilisateurs',
   adminDescription: 'Comptes et autorisations de ressources de ce déploiement.',
   adminTabUsers: 'Utilisateurs',
+  adminTabPermissions: 'Autorisations',
   adminTabRoles: 'Rôles',
   adminAddUser: 'Ajouter un utilisateur',
   adminEdit: 'Modifier',
@@ -237,6 +270,10 @@ export const fr = {
   adminDelete: 'Supprimer',
   adminResourceKind: 'Type de ressource',
   adminResourceId: 'Identifiant de ressource',
+  adminResourceCustom: 'Personnalisé…',
+  adminResourcePickKind: 'Choisir un type',
+  adminResourcePickId: 'Choisir une ressource',
+  adminResourceNoIds: 'Ce type ne liste aucune ressource ; saisissez un ID.',
   adminRoles: 'Rôles',
   adminGrantTo: 'Compte',
   adminSetGrant: 'Définir l’autorisation',
@@ -244,6 +281,9 @@ export const fr = {
   adminForbidden: 'Cette page est réservée aux administrateurs.',
   adminError: 'La requête a échoué. Rechargez la page et réessayez.',
   adminEmpty: 'Rien pour le moment.',
+  adminPermissions: 'Autorisations',
+  adminUserPermissions: 'Autorisations de « {name} »',
+  adminNoGrants: "Cet utilisateur n'a aucune autorisation de ressource.",
 } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
@@ -257,6 +297,7 @@ export const de = {
   adminTitle: 'Benutzerverwaltung',
   adminDescription: 'Konten und Ressourcenberechtigungen dieser Bereitstellung.',
   adminTabUsers: 'Benutzer',
+  adminTabPermissions: 'Berechtigungen',
   adminTabRoles: 'Rollen',
   adminAddUser: 'Benutzer hinzufügen',
   adminEdit: 'Bearbeiten',
@@ -286,6 +327,10 @@ export const de = {
   adminDelete: 'Löschen',
   adminResourceKind: 'Ressourcentyp',
   adminResourceId: 'Ressourcen-ID',
+  adminResourceCustom: 'Benutzerdefiniert…',
+  adminResourcePickKind: 'Typ wählen',
+  adminResourcePickId: 'Ressource wählen',
+  adminResourceNoIds: 'Für diesen Typ sind keine Ressourcen gelistet; ID eingeben.',
   adminRoles: 'Rollen',
   adminGrantTo: 'Konto',
   adminSetGrant: 'Berechtigung setzen',
@@ -293,6 +338,9 @@ export const de = {
   adminForbidden: 'Diese Seite ist nur für Administratoren verfügbar.',
   adminError: 'Die Anfrage ist fehlgeschlagen. Laden Sie die Seite neu und versuchen Sie es erneut.',
   adminEmpty: 'Noch nichts vorhanden.',
+  adminPermissions: 'Berechtigungen',
+  adminUserPermissions: 'Berechtigungen von „{name}“',
+  adminNoGrants: 'Dieser Benutzer hat keine Ressourcenberechtigungen.',
 } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
@@ -306,6 +354,7 @@ export const ru = {
   adminTitle: 'Управление пользователями',
   adminDescription: 'Учётные записи и права на ресурсы этого развёртывания.',
   adminTabUsers: 'Пользователи',
+  adminTabPermissions: 'Права',
   adminTabRoles: 'Роли',
   adminAddUser: 'Добавить пользователя',
   adminEdit: 'Изменить',
@@ -335,6 +384,10 @@ export const ru = {
   adminDelete: 'Удалить',
   adminResourceKind: 'Тип ресурса',
   adminResourceId: 'Идентификатор ресурса',
+  adminResourceCustom: 'Другой…',
+  adminResourcePickKind: 'Выберите тип',
+  adminResourcePickId: 'Выберите ресурс',
+  adminResourceNoIds: 'Для этого типа нет списка ресурсов; введите ID.',
   adminRoles: 'Роли',
   adminGrantTo: 'Учётная запись',
   adminSetGrant: 'Задать права',
@@ -342,6 +395,9 @@ export const ru = {
   adminForbidden: 'Эта страница доступна только администраторам.',
   adminError: 'Запрос не удался. Обновите страницу и попробуйте снова.',
   adminEmpty: 'Пока ничего нет.',
+  adminPermissions: 'Права',
+  adminUserPermissions: 'Права пользователя «{name}»',
+  adminNoGrants: 'У этого пользователя нет прав на ресурсы.',
 } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
@@ -355,6 +411,7 @@ export const pt = {
   adminTitle: 'Gerenciamento de usuários',
   adminDescription: 'Contas e permissões de recursos desta implantação.',
   adminTabUsers: 'Usuários',
+  adminTabPermissions: 'Permissões',
   adminTabRoles: 'Papéis',
   adminAddUser: 'Adicionar usuário',
   adminEdit: 'Editar',
@@ -384,6 +441,10 @@ export const pt = {
   adminDelete: 'Excluir',
   adminResourceKind: 'Tipo de recurso',
   adminResourceId: 'Identificador do recurso',
+  adminResourceCustom: 'Personalizado…',
+  adminResourcePickKind: 'Escolha um tipo',
+  adminResourcePickId: 'Escolha um recurso',
+  adminResourceNoIds: 'Este tipo não lista recursos; digite um ID.',
   adminRoles: 'Papéis',
   adminGrantTo: 'Conta',
   adminSetGrant: 'Definir permissão',
@@ -391,4 +452,7 @@ export const pt = {
   adminForbidden: 'Esta página está disponível apenas para administradores.',
   adminError: 'A solicitação falhou. Recarregue a página e tente novamente.',
   adminEmpty: 'Nada aqui ainda.',
+  adminPermissions: 'Permissões',
+  adminUserPermissions: 'Permissões de "{name}"',
+  adminNoGrants: 'Este usuário não tem permissões de recursos.',
 } satisfies Record<keyof typeof en, string>

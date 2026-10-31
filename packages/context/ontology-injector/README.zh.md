@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-ontology-injector` 用内嵌 RDF 图数据库保存业务本体。每一轮第一步为每个已批准业务域注入一行索引，`domain_summary` 工具按需返回完整词汇。它还提供本体中心工作台：新建业务域、由上传文档生成草稿、编辑或打补丁、快照与审核版本并发布、用基准 Turtle 评估质量、校验、只读 SPARQL 查询，并在分析页签对导入的实例批次运行六个合同指标（按合同去重、附口径说明、支持明细与审计）。只有已发布版本会到达模型。单一根目录保存镜像、快照、实例批次与源文件；摘要上限 4000 字符。
+`dsh-ontology-injector` 用内嵌 RDF 图数据库保存业务本体，每轮为已启用业务域注入一行索引，`domain_summary` 工具按需返回完整词汇。工作台生成、编辑、版本化、发布、校验并查询业务域；分析页签对实例批次运行六个合同指标；合规报告按规则统计 SHACL 违规数——例如缺少签约方标识的合同。检索页签完成三级召回、本体兼容性过滤与 SHACL 闸门，并展示溯源链。只有已发布版本会到达模型；单一根目录保存全部数据；摘要上限 4000 字符。
 
 ## 目录
 
@@ -25,15 +25,19 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-当模型需要在回答制度、订单或其他已命名业务域的问题之前掌握组织的业务词汇时，挂载此插件。注入每轮只发生一次：`agent/pre-step` waterfall 监听器先委托下游，跳过被拒绝或已中止的步骤，并在第 1 步追加一条 user 角色消息。`defaultDomains` 中的业务域按顺序注入，但没有已发布版本的业务域会被跳过，在 `updateDomain` 中被标记为 `disabled` 的业务域同样被跳过。同一会话不会在同一轮收到两次注入。
+当模型需要在回答制度、订单或其他已命名业务域的问题之前掌握组织的业务词汇时，挂载此插件。注入每轮只发生一次：`agent/pre-step` waterfall 监听器先委托下游，跳过被拒绝或已中止的步骤，并在第 1 步追加一条 user 角色消息。默认 `injectionMode: mention` 只注入用户在输入框上方点选、因而出现在消息里的 `@<本体名>`；没有该标记的消息不注入任何内容，就是普通对话，也不会回退到 `defaultDomains`。`injectionMode: always` 才按 `defaultDomains` 顺序注入。没有已发布版本或已停用的业务域都会被跳过，同一会话同一轮不会收到两次注入。
 
 ### 模型能得到什么
 
 每个注入块以 `## 业务域本体知识：<domain>` 开头，携带一行索引：业务域标签与 id、类、对象关系与数据属性的数量，以及取回完整词汇的 `domain_summary` 调用。模型调用该工具时，它读取已发布版本图并渲染 Markdown 摘要：`### 对象类` 列出类标签与本地名，`### 关键关系` 以 `Domain → label → Range` 列出对象属性，`### 数据属性` 列出数据属性及其范围本地名。各块包裹在 `<system-reminder>` 中，并合并为一条来源类型为 `ontology-injector` 的 user 角色消息，因此该索引保留在持久历史中。超过预算的工具文本在行边界处截断，并以截断后缀结尾。
 
+### 在对话里选择本体
+
+新会话页上它与「默认工作区」「标准模式」同处一行（对话开始后落在输入卡片上方），这一个下拉列出所有业务域，停用域置灰并说明原因，默认停在「不使用本体」。点选后草稿里插入 `@<本体名>`，再选「不使用本体」移除，换选则原地替换；当前的选中态由草稿文本推导，所以手删标记后也会自动回到「不使用本体」。宿主只认能匹配到已注册且未停用业务域 label 或 id 的 `@` 标记，其余 `@`（例如 `@README.md`）仍按文件路径交给文件引用提示；命中时该轮注入块首行会先声明「指这个本体域，不是文件路径」。因此业务域 label 必须唯一，重命名时冲突会被拒绝。
+
 ### 配置
 
-最小挂载无需任何配置，但在业务域存在于存储并出现在 `defaultDomains` 之前不会注入任何内容。抽取模型需要 `apiKey` 或 `DEEPSEEK_API_KEY`；其余字段都有默认值。
+最小挂载无需任何配置：默认模式下在对话里点选业务域即生效，`defaultDomains` 只对 `injectionMode: always` 有意义。抽取模型需要 `apiKey` 或 `DEEPSEEK_API_KEY`；其余字段都有默认值。
 
 ```yaml
 - name: '@deepseek-ai/dsh-ontology-injector'
@@ -45,7 +49,8 @@ kind: "package-reference"
 | 字段 | 默认值 | 含义 |
 |---|---|---|
 | `storePath` | 仓库 `ontology-store/` | 保存图镜像与各业务域源文件的根目录 |
-| `defaultDomains` | `[]` | 按顺序去除首尾空白并去重、在第 1 步注入的业务域 id |
+| `defaultDomains` | `[]` | 按顺序去除首尾空白并去重、在第 1 步注入的业务域 id（仅 `always` 模式使用） |
+| `injectionMode` | `mention` | `mention` 只注入消息里 `@` 选中的业务域；`always` 每轮按 `defaultDomains` 注入 |
 | `maxSummaryChars` | `4000` | `domain_summary` 工具返回的摘要保留的最大字符数 |
 | `model` | `deepseek-chat` | 通过 OpenAI 兼容端点调用的抽取模型 |
 | `baseUrl` | `https://api.deepseek.com/v1` | 抽取所用的 chat-completions 端点 |
@@ -65,12 +70,13 @@ kind: "package-reference"
 - `urn:dsh:ontology:audit`——仅追加的审计轨迹。
 - `urn:dsh:ontology:graph:<domain>` 与 `urn:dsh:ontology:graph:<domain>:<version>`——实时图，以及每个版本一份不可变快照。
 - `urn:dsh:ontology:graph:inst:<domain>:<batch>`——每个导入的实例批次一个命名图，替换或清除批次不会触碰本体与其快照。
+- `urn:dsh:ontology:graph:shapes:<domain>`——每个域一个存放 SHACL 形状的命名图。形状与实时图分离，因为工作台编辑会经模型层重写实时图，而该层无法表示 SHACL 空白节点结构。
 - `<domain>/sources/`——上传的文档，以时间戳前缀和净化后的文件名保存；删除业务域不会移除它们。
 - `backups/`——由 `OntologyDatabase.backup()` 写入的镜像。
 
 ### 工作台
 
-Web 客户端面板分为四个页签：业务域列表、图谱工作台、分析页签与审计日志。图谱工作台渲染图画布、节点检查器与版本面板，并在执行破坏性操作前确认。它通过 `ctx.remote.ontologyStore` 与 Host 服务通信，这些方法为 `listDomains`、`createDomain`、`updateDomain`、`deleteDomain`、`generate`、`getGraph`、`applyEdits`、`applyPatch`、`listVersions`、`submitReview`、`publishVersion`、`deleteVersion`、`diffVersions`、`exportDomain`、`importOntology`、`validateDomain`、`evaluateQuality`、`queryDomain`、`listMetrics`、`runMetric`、`explainMetric`、`drilldownMetric`、`listMetricBatches`、`importInstances`、`deleteInstanceBatch`、`auditLog` 与 `health`。
+Web 客户端面板分为五个页签：业务域列表、图谱工作台、分析页签、检索验证与审计日志。头部右侧的作用域下拉把当前业务域带给每个页签——切换后各页签一致地只看这个域，不必回到列表页签重新选择。图谱工作台渲染图画布、节点检查器与版本面板，并在执行破坏性操作前确认。它通过 `ctx.remote.ontologyStore` 与 Host 服务通信，这些方法为 `listDomains`、`createDomain`、`updateDomain`、`deleteDomain`、`generate`、`getGraph`、`applyEdits`、`applyPatch`、`listVersions`、`submitReview`、`publishVersion`、`deleteVersion`、`diffVersions`、`exportDomain`、`importOntology`、`validateDomain`、`evaluateQuality`、`queryDomain`、`listMetrics`、`runMetric`、`explainMetric`、`drilldownMetric`、`listMetricBatches`、`importInstances`、`deleteInstanceBatch`、`importShapes`、`exportShapes`、`complianceReport`、`auditLog` 与 `health`。
 
 生成、编辑、补丁与导入产生的图都是草稿。草稿只改变工作台渲染的工作图，永不改变注入摘要；`submitReview` 将其转为 `review`，`publishVersion` 把该快照复制为实时图并标记激活。重新发布较早的已发布版本即回滚路径，草稿在审核前不能发布。每个节点还记录来源条款与条款文本摘录，在检查器中显示为来源条款与文本。
 
@@ -195,13 +201,14 @@ Web 客户端面板分为四个页签：业务域列表、图谱工作台、分�
 - **每个镜像一个写者**——并发进程在 `graph.db.lock` 上串行；持有者存活时表现为 `ontology/busy`，接管遵循 60 秒年龄阈值，而不是显式解锁。
 - **仅散文摘要**——注入只携带标签、注释与定义域/值域的本地名。约束、基数与 OWL 推理永远不会到达模型，缺失标签时回退到本地名。
 - **静默跳过**——缺失或禁用的业务域不产生块，也没有模型可见提示，因此配置错误的 `defaultDomains` 条目与空本体看起来相同。
+- **`@` 标记在记录里显示成文件引用**——用户消息中的 `@<本体名>` 与文件引用共用 `@` 语法，转录视图会先用文件规则匹配它，点开会指向不存在的路径。本轮只保证宿主解析正确，专用外观与用户文本规则留待下一轮。
 - **审核是流程，而非身份校验**——草稿必须提审后才能发布，但所有调用方共用同一工作台身份；没有逐用户审批或业务域所有权校验。
 - **抽取限制**——生成需要 API key，只接受 DOCX、PDF、MD 与 TXT，每个条款截取 6000 字符，最多处理 `maxClauses` 个条款分组，并信任模型给出的名称与标签 JSON。每个节点最多保留 `maxEvidenceChars` 个字符的条款文本。
 - **只读查询**——`queryDomain` 接受 SELECT 与 ASK，并以 `ontology/query-rejected` 拒绝 INSERT、DELETE、CLEAR、DROP 及其他更新形式；行是词法字符串，不带数据类型或语言标签。
 - **分析依赖本体 IRI**——指标按实时本体声明的 IRI 匹配实例数据。实例使用了本体之外的 IRI 时，这些指标看不到它，`class` 或 `property` 筛选也无法指定它。
 - **去重只看 IRI**——每个指标都按实例 IRI 合并行，因此两份确实不同但共享同一 IRI 的资源会被合并。
 - **不做数值聚合**——指标只统计实例与属性取值，不对数值属性求和或求均值，也不计算金额合计。
-- **实例导入仅支持 Turtle 且不校验本体**——`importInstances` 只解析文档并写入其中声明的全部三元组；没有 CSV 或 Excel 读取器，没有 SHACL 或形状校验，按其他词汇写入的批次只会得到空指标。
+- **实例导入仅支持 Turtle 且不校验本体**——`importInstances` 只解析文档并写入其中声明的全部三元组，按其他词汇写入的批次只会得到空指标；没有 CSV 或 Excel 读取器，也不在导入时拒绝。形状违规由 `complianceReport` 事后发现并按规则计数，但不阻断写入。
 - **不支持降级**——记录为更新格式版本的镜像会被拒绝，且没有回退迁移路径。
 
 <a id="dev-note"></a>

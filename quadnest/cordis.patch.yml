@@ -1,0 +1,5 @@
+# QuadNest: one host row that owns the four companion agents plus the group
+# chat, and one client row that owns the left-sidebar world page.
+- insert:
+    - id: quadnest
+      name: dsh-quadnest

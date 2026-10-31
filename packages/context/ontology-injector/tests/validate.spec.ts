@@ -125,3 +125,43 @@ ex:amount a owl:DatatypeProperty ; rdfs:label "金额" ; rdfs:domain ex:Contract
     expect(report.warnings).toEqual([])
   })
 })
+
+describe('near-duplicate detection', () => {
+  it('flags labels that differ only by a parenthetical qualifier', () => {
+    const report = validateOntology(
+      'contract',
+      document(`ex:Contract a owl:Class ; rdfs:label "合同（微调）" .
+ex:Contract2 a owl:Class ; rdfs:label "合同（二次微调）" .
+ex:hasParty a owl:ObjectProperty ; rdfs:label "所属签约方" ; rdfs:domain ex:Contract ; rdfs:range ex:Contract2 .
+`),
+    )
+    expect(codes(report.warnings)).toContain('near-duplicate-label')
+    expect(report.warnings).toContainEqual(expect.objectContaining({
+      code: 'near-duplicate-label',
+      subject: 'Contract',
+    }))
+  })
+
+  it('flags ids separated only by a counter', () => {
+    const report = validateOntology(
+      'contract',
+      document(`ex:Contract a owl:Class ; rdfs:label "合同" .
+ex:Contract2 a owl:Class ; rdfs:label "契约副本" .
+ex:hasParty a owl:ObjectProperty ; rdfs:label "所属签约方" ; rdfs:domain ex:Contract ; rdfs:range ex:Contract2 .
+`),
+    )
+    expect(codes(report.warnings)).toContain('counter-suffixed-id')
+    expect(codes(report.errors)).not.toContain('near-duplicate-label')
+  })
+
+  it('stays quiet when labels and ids are genuinely distinct', () => {
+    const report = validateOntology(
+      'contract',
+      document(`ex:Contract a owl:Class ; rdfs:label "合同" .
+ex:Supplier a owl:Class ; rdfs:label "供应商" .
+ex:hasSupplier a owl:ObjectProperty ; rdfs:label "供货方" ; rdfs:domain ex:Contract ; rdfs:range ex:Supplier .
+`),
+    )
+    expect(report.warnings).toEqual([])
+  })
+})

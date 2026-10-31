@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib",
+    "tsBuildInfoFile": "lib/tsconfig.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  // 走项目引用而非声明档别名：与 packages/** 下的插件保持同一套解析边界，
+  // 这样源码级改动能被 tsc -b 增量传播，也不会把宿主的 src 拽进本包 rootDir。
+  "references": [
+    { "path": "../../vendor/cordis" },
+    { "path": "../../vendor/schemastery" },
+    { "path": "../../packages/llm/llm" },
+    { "path": "../../packages/core/agent" },
+    { "path": "../../packages/core/tools" },
+    { "path": "../../packages/core/session" }
+  ]
+}

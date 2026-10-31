@@ -39,6 +39,11 @@ const ACTION_KEYS: Record<AuditAction, keyof LocaleDict> = {
   'metric-run': 'auditActionMetricRun',
   'instance-import': 'auditActionInstanceImport',
   'instance-clear': 'auditActionInstanceClear',
+  'object-sync': 'auditActionObjectSync',
+  'action-propose': 'auditActionActionPropose',
+  'action-commit': 'auditActionActionCommit',
+  'compliance-run': 'auditActionComplianceRun',
+  'shapes-import': 'auditActionShapesImport',
 }
 
 /** Props of the store health line. */

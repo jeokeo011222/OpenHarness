@@ -24,7 +24,7 @@ English | [中文](README.zh.md)
 
 ## ✨ Why OpenHarness
 
-Every agent is context-limited. OpenHarness injects **structured business knowledge** into the agent loop at runtime — Turtle OWL/RDF parsed into class and property summaries, augmented by an embedded five-rule OWL RL reasoner — so the model knows *which entities exist*, *how they relate*, and *where each action is exposed* in your ERP.
+Every agent is context-limited. OpenHarness gives the agent a **business ontology it can act through** rather than only read: Turtle OWL/RDF parsed into class and property summaries for the prompt, object types bound to real rows so the model can query them, and declared actions it may only *propose* — a human approves before anything is written.
 
 Around that core sits a plugin-first runtime: clients, tools, storage, and model providers are effects registered on documented seams, so a new capability is a new plugin instead of a new branch in the agent loop.
 
@@ -48,13 +48,14 @@ One request crosses three layers, and nothing in the middle special-cases the en
 | 🔐 **Local Accounts** | Every browser request needs a signed-in local account; there is no platform account to link. Accounts, roles, and per-resource grants live in a SQLite directory. |
 | 👑 **Admin Workbench** | An admin role bypasses resource policy and adds a user-management panel to the sidebar: create, rename, reset, promote, and delete accounts, then grant `owner`/`author`/`reviewer`/`publisher`/`viewer` roles per workspace or session. |
 | 📚 **Ontology Injector** | Parse Turtle OWL/RDF per business domain (contracts, procurement…), summarize classes and properties, and inject the summary into the agent context at pre-step. |
-| 🧠 **OWL RL Inference** | A five-rule embedded reasoner (subclass transitivity, domain/range, `TransitiveProperty`…) runs within a 5 s budget and augments the injected summary. |
+| 🧱 **Bound objects** | Object types bind to CSV or REST sources with a declared primary key and field map. A sync is one transaction and keeps its run history, so the model queries objects instead of guessing at tables. |
+| ⚡ **Declared actions** | Each action lists its parameters, declarative preconditions, and effects. The model proposes; a human approves; only then does the commit run — and the preconditions are re-checked at commit time. |
 | 🔌 **ERP Connector** | A standalone Node router with Zod schemas, an adapter registry, and a transformer pipeline, shipping skeletons for **Yonyou U8 (v13/v15)** and **Kingdee Cloud Galaxy**. |
 | 🖥️ **Mapping Editor** | A React + Vite visual editor that pairs ontology actions with ERP API mappings, with inline transformer specs and a live JSON preview. |
 | 📊 **Data Analysis Bundle** | The `dsh-data-analysis` profile bundle adds analysis tools to the Web client and declares its own sidebar panel, so the capability installs as a bundle patch. |
 | 🧭 **Dual UI** | Web and Desktop frontends share one client package set, so a panel written once renders in both shells. |
 | 🐍 **Python SDK** | A session-projected mirror of the TypeScript loop — the same `SessionEventMap`, the same expected outputs, and the same persistence format. |
-| 🛡️ **Safety First** | Plugin-level sandboxing, a credential boundary, versioned session formats, SHACL double verification for ontology publishes, and an explicit safety notice before the first run. |
+| 🛡️ **Safety First** | Plugin-level sandboxing, a credential boundary, versioned session formats, structural validation before an ontology version is published, and an explicit safety notice before the first run. |
 
 ## 📚 Ontology injection pipeline
 
@@ -64,9 +65,9 @@ One request crosses three layers, and nothing in the middle special-cases the en
 
 Business knowledge is compiled once and read on every turn: published ontologies are verified, stored as an RDF graph, and summarized into the prompt before the first model step.
 
-- **Sources are ordinary files** — each business domain keeps its Turtle OWL/RDF documents next to the project, and an upload publishes them into the graph store after SHACL double verification.
+- **Sources are ordinary files** — each business domain keeps its Turtle OWL/RDF documents next to the project, and an upload publishes them into the graph store after structural validation.
 - **The store is the single truth** — `oxigraph` holds `graph.db.nq` plus uploaded sources, and the injected summary is rebuilt from the store on each request instead of being hand-edited.
-- **Inference stays bounded** — the five-rule OWL RL pass runs inside a 5 s budget and adds subclass, domain/range, and transitive facts to the summary that reaches the model.
+- **Writes need a human** — a proposal records the before/after of every field it would change, every blocking precondition, and the linked objects it touches. No tool can approve one.
 
 ## 🔐 Local accounts and the admin workbench
 
@@ -135,7 +136,7 @@ Openharness/
 - [Cordis](https://github.com/cordiverse/cordis) — spatiotemporal composability runtime
 - [TypeScript](https://www.typescriptlang.org/) `strict: true`, ESM everywhere
 - [oxigraph](https://github.com/oxigraph/oxigraph) — embedded RDF graph database holding ontologies
-- [rdflib](https://github.com/linkeddata/rdflib.js) — embedded RDF/OWL parser with the five-rule OWL RL inference
+- [rdflib](https://github.com/linkeddata/rdflib.js) — embedded RDF/OWL parser for the Turtle vocabulary
 - [Zod](https://zod.dev/) + [Schemastery](https://github.com/cordiverse/schemastery) — config validation
 - [Vite](https://vite.dev/) + [Electron](https://www.electronjs.org/) — dual-frontend stack
 - [pnpm workspaces](https://pnpm.io/workspaces) — monorepo
@@ -152,7 +153,7 @@ Openharness/
 
 ## 🏷️ Keywords
 
-Agent harness · Ontology (OWL/RDF) · Knowledge graph · ERP connector · Yonyou U8 · Kingdee · SHACL · MCP · Plugin architecture · TypeScript · Electron · Web UI · Local accounts · RBAC · SQLite · Python SDK
+Agent harness · Ontology (OWL/RDF) · Knowledge graph · ERP connector · Yonyou U8 · Kingdee · Ontology actions · MCP · Plugin architecture · TypeScript · Electron · Web UI · Local accounts · RBAC · SQLite · Python SDK
 
 ## 🤝 Contributing
 

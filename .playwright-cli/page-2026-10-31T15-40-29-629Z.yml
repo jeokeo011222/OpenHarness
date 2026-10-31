@@ -1,0 +1,27 @@
+- main [ref=e2]:
+  - generic [ref=e3]: Ontology OpenHarness
+  - generic [ref=e5]:
+    - heading "欢迎回来" [level=1] [ref=e6]
+    - paragraph [ref=e7]: 使用企业账号登录，继续你的工作
+    - tablist [ref=e8]:
+      - button "登录" [ref=e9] [cursor=pointer]
+      - button "注册" [ref=e10] [cursor=pointer]
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - generic [ref=e13]:
+          - generic [ref=e14]: 用户名
+          - textbox "用户名" [ref=e16]: admin
+        - generic [ref=e17]:
+          - generic [ref=e18]: 密码
+          - generic [ref=e19]:
+            - textbox "密码" [ref=e20]: dsh-admin-2026
+            - button "显示密码" [ref=e21] [cursor=pointer]
+        - button "登 录" [ref=e25] [cursor=pointer]
+      - paragraph [ref=e26]:
+        - text: 开发测试账号：
+        - code [ref=e27]: admin
+        - text: /
+        - code [ref=e28]: dsh-admin-2026
+        - text: （已自动填充） ·
+        - link "管理控制台" [ref=e29] [cursor=pointer]:
+          - /url: /admin

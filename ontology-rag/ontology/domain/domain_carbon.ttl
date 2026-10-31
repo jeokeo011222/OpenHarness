@@ -1,0 +1,157 @@
+@prefix car:  <http://ontorag.local/carbon#> .
+@prefix top:  <http://ontorag.local/top#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+
+## ---------------------------------------------------------------------------
+## 领域本体：碳核算底稿与边界合规（Carbon Accounting）
+##
+## 覆盖场景：
+##   1) 排放量核算      —— 排放量 = 活动数据 × 排放因子（按 GWP 折算）
+##   2) 边界互斥校验    —— 同一排放源不得同时归属两个互斥核算边界
+##   3) 底稿完整性      —— 核算边界必须声明合并方式（运营/财务/股权）
+## ---------------------------------------------------------------------------
+
+car: a owl:Ontology ;
+    rdfs:label "碳核算子本体"@zh , "Carbon accounting sub-ontology"@en ;
+    owl:versionInfo "1.0.0" ;
+    owl:imports <http://ontorag.local/top> .
+
+## ------------------------------ 类 ------------------------------
+
+car:Organization a owl:Class ;
+    rdfs:subClassOf top:Organization ;
+    rdfs:label "核算主体"@zh .
+
+car:Facility a owl:Class ;
+    rdfs:subClassOf top:Entity ;
+    rdfs:label "设施/厂区"@zh .
+
+car:AccountingBoundary a owl:Class ;
+    rdfs:subClassOf top:Entity ;
+    rdfs:label "核算边界"@zh ;
+    rdfs:comment "一次核算所覆盖的组织与设施范围，决定哪些排放源被计入。"@zh .
+
+car:EmissionSource a owl:Class ;
+    rdfs:subClassOf top:Entity ;
+    rdfs:label "排放源"@zh ;
+    rdfs:comment "锅炉、车辆、外购电等可计量排放单元。"@zh .
+
+car:EmissionRecord a owl:Class ;
+    rdfs:subClassOf top:Entity ;
+    rdfs:label "排放记录"@zh .
+
+car:EmissionFactor a owl:Class ;
+    rdfs:subClassOf top:Entity ;
+    rdfs:label "排放因子"@zh .
+
+car:ReportingPeriod a owl:Class ;
+    rdfs:subClassOf top:TimePeriod ;
+    rdfs:label "报告期"@zh .
+
+## ------------------------------ 对象属性 ------------------------------
+
+car:belongsToBoundary a owl:ObjectProperty ;
+    rdfs:domain car:EmissionSource ;
+    rdfs:range car:AccountingBoundary ;
+    rdfs:label "归属核算边界"@zh .
+
+car:locatedAt a owl:ObjectProperty ;
+    rdfs:domain car:EmissionSource ;
+    rdfs:range car:Facility ;
+    rdfs:label "所在设施"@zh .
+
+car:usesFactor a owl:ObjectProperty ;
+    rdfs:domain car:EmissionRecord ;
+    rdfs:range car:EmissionFactor ;
+    rdfs:label "采用因子"@zh .
+
+car:recordsSource a owl:ObjectProperty ;
+    rdfs:domain car:EmissionRecord ;
+    rdfs:range car:EmissionSource ;
+    rdfs:label "记录排放源"@zh .
+
+car:forPeriod a owl:ObjectProperty ;
+    rdfs:domain car:EmissionRecord ;
+    rdfs:range car:ReportingPeriod ;
+    rdfs:label "所属报告期"@zh .
+
+## ------------------------------ 数据属性 ------------------------------
+
+car:boundaryApproach a owl:DatatypeProperty ;
+    rdfs:domain car:AccountingBoundary ;
+    rdfs:range xsd:string ;
+    rdfs:label "合并方式"@zh ;
+    rdfs:comment "operational | financial | equity，三选一，必填。"@zh .
+
+car:exclusivityGroup a owl:DatatypeProperty ;
+    rdfs:domain car:AccountingBoundary ;
+    rdfs:range xsd:string ;
+    rdfs:label "互斥组"@zh ;
+    rdfs:comment "同一互斥组内的边界不得同时覆盖同一排放源。"@zh .
+
+car:activityData a owl:DatatypeProperty ;
+    rdfs:domain car:EmissionRecord ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "活动数据"@zh .
+
+car:factorValue a owl:DatatypeProperty ;
+    rdfs:domain car:EmissionFactor ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "因子值"@zh .
+
+car:gwp a owl:DatatypeProperty ;
+    rdfs:domain car:EmissionFactor ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "全球增温潜势"@zh .
+
+car:emissionAmount a owl:DatatypeProperty ;
+    rdfs:domain car:EmissionRecord ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "排放量(tCO2e)"@zh .
+
+car:sourceType a owl:DatatypeProperty ;
+    rdfs:domain car:EmissionSource ;
+    rdfs:range xsd:string ;
+    rdfs:label "排放源类型"@zh ;
+    rdfs:comment "stationary | mobile | purchased-electricity | fugitive。"@zh .
+
+## 结论型属性（输出闸门用）
+car:boundaryVerdict a owl:DatatypeProperty ;
+    rdfs:domain car:EmissionSource ;
+    rdfs:range xsd:string ;
+    rdfs:label "边界结论"@zh ;
+    rdfs:comment "exclusive | conflicting。"@zh .
+
+car:claimedEmission a owl:DatatypeProperty ;
+    rdfs:domain car:EmissionRecord ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "结论排放量"@zh ;
+    rdfs:comment "模型给出的核算结论，SHACL 会用活动数据与因子反算校验。"@zh .
+
+## ------------------------- 术语同义词（实体链接用） -------------------------
+
+car:EmissionSource skos:altLabel "排放源" , "排放单元" , "碳源" , "emission source" .
+car:AccountingBoundary skos:altLabel "核算边界" , "边界" , "组织边界" , "boundary" .
+car:EmissionRecord skos:altLabel "排放记录" , "排放数据" , "碳排数据" .
+car:EmissionFactor skos:altLabel "排放因子" , "碳排因子" , "factor" .
+car:emissionAmount skos:altLabel "排放量" , "碳排放量" , "tCO2e" .
+car:boundaryApproach skos:altLabel "合并方式" , "核算方法" , "边界方法" .
+
+## ------------------------- SHACL 前缀声明 -------------------------
+
+car: a owl:Ontology ;
+    sh:declare [
+        sh:prefix "car" ;
+        sh:namespace "http://ontorag.local/carbon#"^^xsd:anyURI ;
+    ] , [
+        sh:prefix "top" ;
+        sh:namespace "http://ontorag.local/top#"^^xsd:anyURI ;
+    ] , [
+        sh:prefix "xsd" ;
+        sh:namespace "http://www.w3.org/2001/XMLSchema#"^^xsd:anyURI ;
+    ] .

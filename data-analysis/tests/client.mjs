@@ -117,7 +117,7 @@ test('apply registers dictionaries, the workbench page, the sidebar row, the tab
   assert.equal(tabs[0].guide[0].title(), '数据分析')
   assert.equal(typeof tabs[0].guide[0].icon, 'function')
   assert.equal(tabs[0].guide[0].icon({}).type, 'svg')
-  assert.equal(slots.length, 3)
+  assert.equal(slots.length, 4)
   assert.equal(slots[0].spec.name, 'main')
   assert.equal(slots[0].spec.key, 'data-analysis')
   assert.equal(slots[0].spec.locale, 'dataAnalysis')
@@ -131,11 +131,17 @@ test('apply registers dictionaries, the workbench page, the sidebar row, the tab
   assert.equal(slots[2].spec.key, 'dsh-data-analysis')
   assert.equal(slots[2].spec.locale, 'dataAnalysis')
   assert.equal(typeof slots[2].spec.inject, 'function')
-  assert.equal(slots[2].component.name, 'AnalysisPanel')
+  assert.equal(slots[2].component.name, 'AnalysisPane')
+  assert.equal(slots.length, 4)
+  assert.equal(slots[3].spec.name, 'conversation.input.dock')
+  assert.equal(slots[3].spec.id, 'data-analysis-ai-bridge')
+  assert.equal(slots[3].component.name, 'AiDockBridge')
+  assert.equal(slots[3].component({ inputActions: { setDraft() {} } }), null)
   assert.ok(effects.some(label => label.includes('workbench page')))
   assert.ok(effects.some(label => label.includes('sidebar row')))
   assert.ok(effects.some(label => label.includes('styles')))
   assert.ok(effects.some(label => label.includes('tab body')))
+  assert.ok(effects.some(label => label.includes('ai bridge')))
 })
 
 // --- workspace loading ----------------------------------------------------
@@ -207,13 +213,18 @@ const faceCtx = {
 /**
  * Create the face through the registered slot's inject factory.
  * @param ctx - Fake client context.
+ * @param sessionId - Session the tab is bound to; omit to stand for "no conversation open".
  * @returns The face.
  */
-function faceFrom(ctx) {
+function faceFrom(ctx, sessionId = 'session-1') {
   let spec
   const slots = {
     inject(owner, factory) { factory() },
-    register(value) { spec = value; return () => {} },
+    register(value) {
+      // The dock bridge registers last and carries no face; keep the panel body.
+      if (value.name === 'sidebar.right.pane.tab') spec = value
+      return () => {}
+    },
   }
   const apply = plugin.apply
   const fakeCtx = {
@@ -225,52 +236,130 @@ function faceFrom(ctx) {
     remote: ctx.remote,
   }
   apply(fakeCtx)
-  return spec.inject('session-1')
+  return spec.inject(sessionId)
 }
 
-test('face reads index, meta, rows, and charts from the workspace', async () => {
-  const face = faceFrom(faceCtx)
-  const index = await face.loadIndex(new AbortController().signal)
-  assert.equal(index.ok, true)
-  assert.equal(index.value.datasets[0].name, '销售明细')
-  const meta = await face.loadMeta('ds_00000001', new AbortController().signal)
-  assert.equal(meta.ok, true)
-  assert.equal(meta.value.schema.length, 3)
-  const rows = await face.loadRows('ds_00000001', new AbortController().signal)
-  assert.equal(rows.ok, true)
-  assert.equal(rows.value.rows.length, 5)
-  assert.equal(rows.value.eof, false)
-  const charts = await face.loadCharts(new AbortController().signal)
-  assert.equal(charts.ok, true)
-  assert.equal(charts.value.charts[0].id, 'ch_00000001')
-  const missing = await face.loadMeta('ds_missing', new AbortController().signal)
-  assert.equal(missing.ok, false)
-  assert.equal(missing.error.code, 'workspace-file/not-found')
-  assert.ok(remoteCalls.every(call => call.sessionId === 'session-1'))
+/**
+ * Answer one workbench API path the way the Host does.
+ * @param pathname - Requested path below the plugin API prefix.
+ * @param query - Query parameters.
+ * @returns A Response carrying the shared envelope.
+ */
+function fakeApi(pathname, query) {
+  const envelope = value => new Response(JSON.stringify({ ok: true, value }), { status: 200 })
+  if (pathname === '/state') {
+    return envelope({ datasets: [{ id: 'ds_00000001', name: '销售明细' }], charts: [{ id: 'ch_00000001' }], connections: [], sources: [] })
+  }
+  if (pathname === '/dataset') {
+    if (query.get('id') !== 'ds_00000001') {
+      return new Response(JSON.stringify({ ok: false, error: { code: 'not_found', message: 'no such dataset' } }), { status: 400 })
+    }
+    return envelope({ meta: metaDocument, profile: {}, preview: [] })
+  }
+  if (pathname === '/rows') return envelope({ rows: dataRows, lines: 5, eof: false })
+  return new Response(JSON.stringify({ ok: false, error: { code: 'not_found', message: 'no route' } }), { status: 404 })
+}
+
+test('face reads state, meta, rows, and charts over the workbench API', async () => {
+  const original = globalThis.fetch
+  const seen = []
+  globalThis.fetch = async input => {
+    const url = new URL(String(input), 'http://localhost')
+    seen.push({ pathname: url.pathname, session: url.searchParams.get('sessionId') })
+    return fakeApi(url.pathname.slice('/plugins/data-analysis/api'.length), url.searchParams)
+  }
+  try {
+    const face = faceFrom(faceCtx)
+    const index = await face.loadIndex(new AbortController().signal)
+    assert.equal(index.ok, true)
+    assert.equal(index.value.datasets[0].name, '销售明细')
+    const meta = await face.loadMeta('ds_00000001', new AbortController().signal)
+    assert.equal(meta.ok, true)
+    assert.equal(meta.value.schema.length, 3)
+    const rows = await face.loadRows('ds_00000001', new AbortController().signal)
+    assert.equal(rows.ok, true)
+    assert.equal(rows.value.rows.length, 5)
+    assert.equal(rows.value.eof, false)
+    const charts = await face.loadCharts(new AbortController().signal)
+    assert.equal(charts.ok, true)
+    assert.equal(charts.value.charts[0].id, 'ch_00000001')
+    const missing = await face.loadMeta('ds_missing', new AbortController().signal)
+    assert.equal(missing.ok, false)
+    assert.equal(missing.error.code, 'not_found')
+    assert.ok(seen.every(call => call.session === 'session-1'))
+  } finally {
+    globalThis.fetch = original
+  }
 })
 
-test('face retries the row read with a smaller limit after a bad-request', async () => {
-  const calls = []
-  const ctx = {
-    remote: {
-      workspaceFiles: {
-        async read(sessionId, path, range) {
-          calls.push({ path, range })
-          if (path.endsWith('data.ndjson') && range.limit === 5000) {
-            return { ok: false, error: { code: 'gateway/bad-request', message: 'limit exceeds the configured maximum' } }
-          }
-          return { ok: true, value: { ...textOf(JSON.stringify({ a: 1 })), eof: true } }
-        },
-      },
-    },
+test('face reports an expired sign-in instead of a generic failure', async () => {
+  const original = globalThis.fetch
+  globalThis.fetch = async () => new Response('{}', { status: 401 })
+  try {
+    const face = faceFrom(faceCtx)
+    const rows = await face.loadRows('ds_x', new AbortController().signal)
+    assert.equal(rows.ok, false)
+    assert.equal(rows.error.code, 'unauthorized')
+  } finally {
+    globalThis.fetch = original
   }
-  const face = faceFrom(ctx)
-  const rows = await face.loadRows('ds_x', new AbortController().signal)
-  assert.equal(rows.ok, true)
-  assert.equal(rows.value.rows.length, 1)
-  assert.equal(calls.length, 2)
-  assert.equal(calls[0].range.limit, 5000)
-  assert.equal(calls[1].range.limit, 1000)
+})
+
+test('face reports an unreachable Host as a network failure', async () => {
+  const original = globalThis.fetch
+  globalThis.fetch = async () => { throw new TypeError('fetch failed') }
+  try {
+    const face = faceFrom(faceCtx)
+    const state = await face.state(new AbortController().signal)
+    assert.equal(state.ok, false)
+    assert.equal(state.error.code, 'network')
+  } finally {
+    globalThis.fetch = original
+  }
+})
+
+// The right-sidebar tab can be mounted with no conversation in view. Firing a
+// request then only earns "needs a sessionId with a workspace" on the Host, so
+// the face answers locally and the pane shows its empty state instead.
+test('face without a Session refuses locally instead of calling the Host', async () => {
+  const original = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = async () => {
+    calls += 1
+    return new Response('{}', { status: 200 })
+  }
+  try {
+    // `null` keeps the missing-Session path while still bypassing faceFrom's
+    // default; the guard treats every non-string the same way, `undefined` too.
+    const face = faceFrom(faceCtx, null)
+    assert.equal(face.sessionMissing, true)
+    const state = await face.state(new AbortController().signal)
+    assert.equal(state.ok, false)
+    assert.equal(state.error.code, 'no_session')
+    assert.equal(calls, 0)
+  } finally {
+    globalThis.fetch = original
+  }
+})
+
+test('face explains a missing workspace in the reader language', async () => {
+  const original = globalThis.fetch
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    ok: false,
+    error: { code: 'missing_workspace', message: 'This request needs a sessionId with a workspace, or an absolute cwd.' },
+  }), { status: 400 })
+  try {
+    const face = faceFrom(faceCtx)
+    const state = await face.state(new AbortController().signal)
+    assert.equal(state.ok, false)
+    assert.equal(state.error.code, 'missing_workspace')
+    // The Host phrase is a log line; the page owes the reader what to do about
+    // it, in their own language.
+    assert.ok(state.error.message.includes('对话'), state.error.message)
+    assert.notEqual(state.error.message, 'This request needs a sessionId with a workspace, or an absolute cwd.')
+  } finally {
+    globalThis.fetch = original
+  }
 })
 
 // --- aggregation ----------------------------------------------------------
@@ -502,8 +591,86 @@ test('hidden series empties the chart with an explanation', () => {
   assert.equal(tree.types.includes('svg'), false)
 })
 
-// --- run ------------------------------------------------------------------
+// --- workbook worksheet picker ---------------------------------------------
 
+/**
+ * Collect the text nodes and checkbox props of a rendered tree.
+ * @param node - Element or children array.
+ * @param out - `{ texts, checks }` collector.
+ * @returns The collector.
+ */
+function survey(node, out = { texts: [], checks: [] }) {
+  if (Array.isArray(node)) {
+    for (const child of node) survey(child, out)
+    return out
+  }
+  if (typeof node === 'string') {
+    out.texts.push(node)
+    return out
+  }
+  if (!node || typeof node !== 'object') return out
+  if (node.type === 'input') out.checks.push(node.props)
+  survey(node.children, out)
+  return out
+}
+
+test('worksheet picker lists every tab with its size and locks empty ones', () => {
+  const element = plugin.__test.SheetPicker({
+    sheets: [
+      { name: '订单', rows: 120, columns: 4, header: ['日期', '金额'] },
+      { name: '空白', rows: 0, columns: 1, empty: true, header: ['备注'] },
+    ],
+    picked: { 订单: true },
+    busy: false,
+    t,
+    onPick: () => {},
+    onPickAll: () => {},
+    onPickNone: () => {},
+  })
+  const { texts, checks } = survey(element)
+  assert.equal(checks.length, 2, 'one checkbox per worksheet')
+  assert.equal(checks[0].checked, true)
+  assert.equal(checks[0].disabled, false)
+  assert.equal(checks[1].checked, false)
+  assert.equal(checks[1].disabled, true, 'a header-only tab cannot be imported')
+  assert.ok(texts.includes('订单'))
+  assert.ok(texts.includes('120 行 · 4 列'))
+  assert.ok(texts.includes('空工作表'))
+  assert.ok(texts.includes('共 2 个工作表 · 已选 1 个'))
+  assert.ok(texts.includes('首行：日期 · 金额'))
+})
+
+test('multi-dataset brief covers every table and asks for join keys', () => {
+  const meta = (id, name, columns) => ({
+    id,
+    name,
+    rowCount: 100,
+    columnCount: columns.length,
+    schema: columns.map(column => ({ name: column, type: 'number', role: 'measure' })),
+    stats: { columns: {}, nullRateByColumn: {} },
+  })
+  const balance = meta('ds_bs', '资产负债表', ['期间', '货币资金', '资产总计'])
+  const income = meta('ds_is', '利润表', ['期间', '营业收入', '净利润'])
+  const cash = meta('ds_cf', '现金流量表', ['期间', '经营现金流净额'])
+
+  const single = plugin.__test.composeBrief([balance], ['overview'], '')
+  assert.ok(single.includes('请分析数据集「资产负债表」'), single.slice(0, 120))
+  assert.equal(single.includes('跨数据集要求'), false, 'one dataset needs no join rule')
+  assert.equal(single.includes('每次调用都要带自己的 datasetId'), false)
+
+  const multi = plugin.__test.composeBrief([balance, income, cash], ['overview', 'compare'], '单位：万元')
+  for (const item of [balance, income, cash]) {
+    assert.ok(multi.includes('「' + item.name + '」'), item.name)
+    assert.ok(multi.includes(item.id), item.id)
+  }
+  assert.ok(multi.includes('请一起分析以下 3 个数据集'))
+  assert.ok(multi.includes('跨数据集要求'))
+  assert.ok(multi.includes('关联键'))
+  assert.ok(multi.includes('每次调用都要带自己的 datasetId'))
+  assert.ok(multi.includes('补充说明：单位：万元'))
+})
+
+// --- run ------------------------------------------------------------------
 let failed = 0
 for (const { name, fn } of tests) {
   try {

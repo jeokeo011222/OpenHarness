@@ -1,0 +1,45 @@
+{
+  "description": "业务源库到 RDF 的映射配置。字段名随客户环境变化，所以不写进代码。",
+  "tables": [
+    {
+      "name": "contract",
+      "query": "SELECT c.contract_no AS id, c.amount, c.paid_amount, c.retention_rate, c.status, c.supplier_no, c.updated_at FROM contracts c",
+      "class": "con:Contract",
+      "subject": "http://ontorag.local/tenant/{tenant}/contract#{id}",
+      "id_column": "id",
+      "updated_column": "updated_at",
+      "properties": {
+        "con:contractAmount": { "column": "amount", "type": "decimal" },
+        "con:paidAmount": { "column": "paid_amount", "type": "decimal" },
+        "con:retentionRate": { "column": "retention_rate", "type": "decimal" },
+        "con:contractStatus": { "column": "status", "type": "string" }
+      },
+      "links": {
+        "con:signedWith": {
+          "column": "supplier_no",
+          "subject": "http://ontorag.local/tenant/{tenant}/contract#{value}",
+          "class": "con:Supplier"
+        }
+      }
+    },
+    {
+      "name": "payment_application",
+      "query": "SELECT p.payment_no AS id, p.amount, p.status, p.contract_no, p.updated_at FROM payment_applications p",
+      "class": "con:PaymentApplication",
+      "subject": "http://ontorag.local/tenant/{tenant}/contract#{id}",
+      "id_column": "id",
+      "updated_column": "updated_at",
+      "properties": {
+        "con:paymentAmount": { "column": "amount", "type": "decimal" },
+        "con:paymentStatus": { "column": "status", "type": "string" }
+      },
+      "links": {
+        "con:appliesToContract": {
+          "column": "contract_no",
+          "subject": "http://ontorag.local/tenant/{tenant}/contract#{value}",
+          "class": "con:Contract"
+        }
+      }
+    }
+  ]
+}

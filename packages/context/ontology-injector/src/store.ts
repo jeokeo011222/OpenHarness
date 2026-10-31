@@ -167,9 +167,96 @@ function liveGraphName(domain: string): string {
   return `${DSH}graph:${domain}`
 }
 
+/**
+ * Named graph IRI holding a domain's live ontology.
+ *
+ * Exported because retrieval must scope every SPARQL query with `GRAPH <iri>`:
+ * the store keeps every domain, every version, and every instance batch in one
+ * dataset, so an unscoped query silently mixes contract and carbon facts.
+ *
+ * @param domain - the domain id.
+ * @returns the absolute graph IRI.
+ */
+export function ontologyGraphIri(domain: string): string {
+  return liveGraphName(domain)
+}
+
+/**
+ * Named graph IRI holding one instance batch.
+ *
+ * @param domain - the domain id.
+ * @param batch - the batch id.
+ * @returns the absolute graph IRI.
+ */
+export function instanceGraphIri(domain: string, batch: string): string {
+  return instanceGraphName(domain, batch)
+}
+
 /** Named graph IRI of one version snapshot. */
 function versionGraphName(domain: string, version: string): string {
   return `${DSH}graph:${domain}:${version}`
+}
+
+/** Named graph IRI of a domain's SHACL shapes. */
+function shapesGraphName(domain: string): string {
+  return `${DSH}graph:shapes:${domain}`
+}
+
+/**
+ * Named graph IRI holding a domain's SHACL shapes.
+ *
+ * Shapes live in their own graph rather than the live ontology graph: a
+ * workbench edit rewrites the live graph through the model, which cannot
+ * represent SHACL blank-node structures, and shapes change on a different
+ * cadence than ontology versions.
+ *
+ * @param domain - the domain id.
+ * @returns the absolute graph IRI.
+ */
+export function shapesGraphIri(domain: string): string {
+  return shapesGraphName(domain)
+}
+
+/**
+ * Replace a domain's SHACL shapes with the given Turtle.
+ *
+ * The whole shapes graph is replaced, matching `writeLiveTurtle`: a shapes
+ * document is authored as a unit, and keeping partial merges of blank-node
+ * property constraints has no correct semantics.
+ *
+ * @param root - the ontology store root.
+ * @param domain - the domain id.
+ * @param turtle - the shapes Turtle document.
+ * @returns the number of quads written.
+ * @throws {OntologyStoreError} `query-rejected` when the Turtle cannot be parsed.
+ */
+export async function writeShapes(root: string, domain: string, turtle: string): Promise<number> {
+  const graph = shapesGraphName(domain)
+  let quads: Quad[]
+  try {
+    quads = OntologyDatabase.parseGraph(graph, turtle)
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    throw new OntologyStoreError('query-rejected', `Shapes Turtle 无法解析：${reason}`)
+  }
+  const db = await database(root)
+  await db.mutate((store) => {
+    dropGraph(store, graph)
+    for (const entry of quads) store.add(entry)
+  })
+  return quads.length
+}
+
+/**
+ * Read a domain's SHACL shapes as Turtle.
+ *
+ * @param root - the ontology store root.
+ * @param domain - the domain id.
+ * @returns the shapes Turtle, or an empty string when the domain has no shapes.
+ */
+export async function readShapesTurtle(root: string, domain: string): Promise<string> {
+  const db = await database(root)
+  return db.graphTurtle(shapesGraphName(domain))
 }
 
 /** Subject IRI of one version record. */
@@ -695,6 +782,7 @@ export async function deleteDomain(root: string, domain: string): Promise<void> 
   const db = await database(root)
   await db.mutate((store) => {
     dropGraph(store, liveGraphName(domain))
+    dropGraph(store, shapesGraphName(domain))
     for (const subject of versionSubjectsOf(store, domain)) {
       const recorded = firstObject(store, subject, PREDICATE_VERSION)
       const version = recorded ?? subject.value.slice(`${DSH}domain:${domain}:version:`.length)
@@ -1004,6 +1092,8 @@ async function importLegacyLayout(root: string, db: OntologyDatabase): Promise<v
     const meta = await readLegacyDomainMeta(domainDir, domain)
     const livePath = join(domainDir, 'ontology.ttl')
     if (existsSync(livePath)) await db.replaceGraph(liveGraphName(domain), await readFile(livePath, 'utf8'))
+    const shapesPath = join(domainDir, 'shapes.ttl')
+    if (existsSync(shapesPath)) await db.replaceGraph(shapesGraphName(domain), await readFile(shapesPath, 'utf8'))
     for (const version of await readLegacyVersions(domainDir)) {
       const record = await readLegacyVersionRecord(domainDir, version)
       const turtle = await readFile(join(domainDir, 'versions', version, 'ontology.ttl'), 'utf8')

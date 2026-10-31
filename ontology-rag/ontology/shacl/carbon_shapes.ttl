@@ -1,0 +1,93 @@
+@prefix car:  <http://ontorag.local/carbon#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+
+## ---------------------------------------------------------------------------
+## 碳核算 SHACL 约束
+## ---------------------------------------------------------------------------
+
+car: a owl:Ontology ;
+    rdfs:label "碳核算 SHACL 约束集"@zh .
+
+## ---------------- 1. 同一排放源不得归属互斥边界 ----------------
+
+car:EmissionSourceSingleBoundary
+    a sh:NodeShape ;
+    rdfs:label "排放源在同一互斥组内只能归属一个核算边界"@zh ;
+    sh:targetClass car:EmissionSource ;
+    sh:sparql [
+        sh:message "边界冲突：排放源 {?this} 在互斥组 {?group} 内同时归属 {?count} 个边界（{?boundaries}）" ;
+        sh:prefixes car: ;
+        sh:select """
+            SELECT $this ?group ?count (GROUP_CONCAT(DISTINCT ?boundary; separator=", ") AS ?boundaries)
+            WHERE {
+                $this car:belongsToBoundary ?boundary .
+                ?boundary car:exclusivityGroup ?group .
+            }
+            GROUP BY $this ?group
+            HAVING (COUNT(DISTINCT ?boundary) > 1)
+            """ ;
+    ] .
+
+## ---------------- 2. 排放量必须等于活动数据×因子×GWP ----------------
+
+car:EmissionAmountMatchesFactor
+    a sh:NodeShape ;
+    rdfs:label "排放量必须与活动数据和因子一致"@zh ;
+    sh:targetClass car:EmissionRecord ;
+    sh:sparql [
+        sh:message "核算错误：记录 {?this} 填报排放量 {?actual}，按活动数据与因子应为 {?expected}" ;
+        sh:prefixes car: ;
+        sh:select """
+            SELECT $this ?actual ?expected
+            WHERE {
+                $this car:activityData ?activity ;
+                      car:emissionAmount ?actual ;
+                      car:usesFactor ?factor .
+                ?factor car:factorValue ?factorValue .
+                OPTIONAL { ?factor car:gwp ?gwpValue }
+                BIND(?activity * ?factorValue * COALESCE(?gwpValue, 1) AS ?expected)
+                FILTER(ABS(?actual - ?expected) > (0.01 * ABS(?expected) + 0.0001))
+            }
+            """ ;
+    ] ;
+    sh:property [
+        sh:path car:emissionAmount ;
+        sh:minCount 1 ;
+        sh:datatype xsd:decimal ;
+        sh:message "排放记录 {?this} 缺少排放量" ;
+    ] .
+
+## ---------------- 3. 核算边界必须声明合并方式 ----------------
+
+car:BoundaryApproachRequired
+    a sh:NodeShape ;
+    rdfs:label "核算边界必须声明合并方式"@zh ;
+    sh:targetClass car:AccountingBoundary ;
+    sh:property [
+        sh:path car:boundaryApproach ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:in ( "operational" "financial" "equity" ) ;
+        sh:message "核算边界 {?this} 未声明合并方式，或取值不在 operational/financial/equity 内" ;
+    ] .
+
+## ---------------- 4. 排放记录必须可追溯 ----------------
+
+car:EmissionRecordTraceable
+    a sh:NodeShape ;
+    rdfs:label "排放记录必须关联排放源与报告期"@zh ;
+    sh:targetClass car:EmissionRecord ;
+    sh:property [
+        sh:path car:recordsSource ;
+        sh:minCount 1 ;
+        sh:message "排放记录 {?this} 未关联排放源，无法追溯" ;
+    ] ;
+    sh:property [
+        sh:path car:forPeriod ;
+        sh:minCount 1 ;
+        sh:message "排放记录 {?this} 未关联报告期" ;
+    ] .

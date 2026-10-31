@@ -9,6 +9,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { crc32, deflateRawSync } from 'node:zlib'
 import { applyHost } from '../host/plugin.js'
+import { importWorkbookSheets, listSheets } from '../host/importers.js'
 import { assertReadOnlySql } from '../host/sql.js'
 import { compileExpression } from '../host/expr.js'
 import { suggestChart } from '../host/charts.js'
@@ -76,6 +77,11 @@ function createCtx() {
   const ctx = {
     effect(fn) {
       fn()
+    },
+    // Services are declared, never property-accessed, so a headless profile
+    // (no web server) is just an absent seat here.
+    get(name) {
+      return ctx[name]
     },
     tools: {
       register(definition) {
@@ -381,6 +387,88 @@ try {
   const targetSheet = await callTool(tools, 'dataset_import_file', { path: 'book.xlsx', sheet: '目标', name: '目标表' }, cwd)
   check('reads a named worksheet', targetSheet.rowCount === 1 && targetSheet.columnCount === 1, JSON.stringify(targetSheet.columns))
   await rejects('reports missing worksheets', () => callTool(tools, 'dataset_import_file', { path: 'book.xlsx', sheet: '不存在' }, cwd), 'was not found')
+
+  // 15b. Multi-sheet import: a workbook becomes one dataset per ticked tab.
+  const multiBook = path.join(cwd, 'multi.xlsx')
+  await writeFile(multiBook, makeZip({
+    '[Content_Types].xml': '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+    'xl/workbook.xml': '<?xml version="1.0"?><workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="华东" sheetId="1" r:id="rId1"/><sheet name="华南" sheetId="2" r:id="rId2"/><sheet name="空白" sheetId="3" r:id="rId3"/><sheet name="华北" sheetId="4" r:id="rId4"/></sheets></workbook>',
+    'xl/_rels/workbook.xml.rels': '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Target="worksheets/sheet3.xml"/><Relationship Id="rId4" Target="worksheets/sheet4.xml"/></Relationships>',
+    'xl/worksheets/sheet1.xml': '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>城市</t></is></c><c r="B1" t="inlineStr"><is><t>销量</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>上海</t></is></c><c r="B2"><v>12</v></c></row></sheetData></worksheet>',
+    'xl/worksheets/sheet2.xml': '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>城市</t></is></c><c r="B1" t="inlineStr"><is><t>销量</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>广州</t></is></c><c r="B2"><v>8</v></c></row><row r="3"><c r="A3" t="inlineStr"><is><t>深圳</t></is></c><c r="B3"><v>9</v></c></row></sheetData></worksheet>',
+    'xl/worksheets/sheet3.xml': '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>备注</t></is></c></row></sheetData></worksheet>',
+    'xl/worksheets/sheet4.xml': '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>城市</t></is></c><c r="B1" t="inlineStr"><is><t>销量</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>北京</t></is></c><c r="B2"><v>21</v></c></row></sheetData></worksheet>',
+  }))
+
+  const sheetFacts = await listSheets(cwd, 'multi.xlsx')
+  check('lists worksheets with row and column facts',
+    sheetFacts.sheets.length === 4
+      && sheetFacts.sheets[0].name === '华东' && sheetFacts.sheets[0].rows === 1 && sheetFacts.sheets[0].columns === 2
+      && sheetFacts.sheets[1].rows === 2
+      && sheetFacts.sheets[2].empty === true
+      && sheetFacts.preferred === '华东',
+    JSON.stringify(sheetFacts))
+
+  const multi = await importWorkbookSheets(cwd, { path: 'multi.xlsx', sheets: ['华东', '华南', '空白'] })
+  check('imports several worksheets into one dataset each',
+    multi.datasets.length === 2
+      && multi.datasets[0].name === 'multi · 华东' && multi.datasets[0].rowCount === 1
+      && multi.datasets[1].name === 'multi · 华南' && multi.datasets[1].rowCount === 2
+      && multi.datasets[1].source.detail.sheet === '华南'
+      && multi.failures.length === 0,
+    JSON.stringify(multi.datasets.map(entry => [entry.name, entry.rowCount])))
+  check('a header-only worksheet is skipped, not failed',
+    multi.skipped.length === 1 && multi.skipped[0].sheet === '空白',
+    JSON.stringify(multi.skipped))
+
+  const oneOfMany = await importWorkbookSheets(cwd, { path: 'multi.xlsx', sheets: ['华北'], name: '华北销量' })
+  check('a single ticked worksheet keeps the name the caller gave',
+    oneOfMany.datasets.length === 1 && oneOfMany.datasets[0].name === '华北销量',
+    JSON.stringify(oneOfMany.datasets.map(entry => entry.name)))
+
+  const repeated = await importWorkbookSheets(cwd, { path: 'multi.xlsx', sheets: ['华南'] })
+  check('re-importing the same worksheet reuses its dataset instead of duplicating',
+    repeated.datasets.length === 1 && repeated.datasets[0].reused === true && repeated.datasets[0].name === 'multi · 华南',
+    JSON.stringify(repeated.datasets.map(entry => [entry.name, entry.reused])))
+
+  await rejects('rejects unknown worksheets in a multi-sheet import',
+    () => importWorkbookSheets(cwd, { path: 'multi.xlsx', sheets: ['华东', '缺失'] }), 'was not found')
+  await rejects('rejects multi-sheet import of a delimited file',
+    () => importWorkbookSheets(cwd, { path: 'nulls.csv' }), 'only .xlsx')
+
+  // 15c. A stacked group header is folded into the column names, and the row
+  // that carries the field labels never surfaces as a record.
+  const stackedBook = path.join(cwd, 'stacked.xlsx')
+  const cell = (reference, text) => `<c r="${reference}" t="inlineStr"><is><t>${text}</t></is></c>`
+  const number = (reference, value) => `<c r="${reference}"><v>${value}</v></c>`
+  await writeFile(stackedBook, makeZip({
+    '[Content_Types].xml': '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+    'xl/workbook.xml': '<?xml version="1.0"?><workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="分期" sheetId="1" r:id="rId1"/><sheet name="明细" sheetId="2" r:id="rId2"/></sheets></workbook>',
+    'xl/_rels/workbook.xml.rels': '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Target="worksheets/sheet2.xml"/></Relationships>',
+    'xl/worksheets/sheet1.xml': `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">${cell('A1', '序号')}${cell('B1', '单位')}${cell('C1', '2023年一期')}${cell('D1', '')}${cell('E1', '')}${cell('F1', '2024年一期')}${cell('G1', '')}${cell('H1', '')}${cell('I1', '')}${cell('J1', '')}</row><row r="2">${number('A2', 34)}${cell('B2', '')}${cell('C2', '欠费金额')}${cell('D2', '结算金额')}${cell('E2', '回款时间')}${cell('F2', '欠费金额')}${cell('G2', '结算金额')}${cell('H2', '回款时间')}${cell('I2', '开票时间')}${cell('J2', '备注')}</row><row r="3">${number('A3', 1)}${cell('B3', '甲公司')}${number('C3', 100)}${number('D3', 200)}${cell('E3', '2024-01-05')}${number('F3', 110)}${number('G3', 220)}${cell('H3', '2024-02-05')}${cell('I3', '2024-01-06')}${cell('J3', '正常')}</row><row r="4">${number('A4', 2)}${cell('B4', '乙公司')}${number('C4', 300)}${number('D4', 400)}${cell('E4', '2024-03-05')}${number('F4', 310)}${number('G4', 420)}${cell('H4', '2024-04-05')}${cell('I4', '2024-03-06')}${cell('J4', '逾期')}</row></sheetData></worksheet>`,
+    'xl/worksheets/sheet2.xml': `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">${cell('A1', '城市')}${cell('B1', '公司')}${cell('C1', '状态')}</row><row r="2">${cell('A2', '上海')}${cell('B2', '甲公司')}${cell('C2', '正常')}</row></sheetData></worksheet>`,
+  }))
+
+  const stacked = await callTool(tools, 'dataset_import_file', { path: 'stacked.xlsx', sheet: '分期' }, cwd)
+  check('folds a group header into "group · field" names',
+    JSON.stringify(stacked.columns.map(column => column.name)) === JSON.stringify([
+      '序号', '单位',
+      '2023年一期 · 欠费金额', '2023年一期 · 结算金额', '2023年一期 · 回款时间',
+      '2024年一期 · 欠费金额', '2024年一期 · 结算金额', '2024年一期 · 回款时间',
+      '2024年一期 · 开票时间', '2024年一期 · 备注',
+    ]),
+    JSON.stringify(stacked.columns.map(column => column.name)))
+  check('drops the field-label row instead of keeping it as a record',
+    stacked.rowCount === 2 && stacked.preview[0]['序号'] === 1 && stacked.preview[0]['2023年一期 · 欠费金额'] === 100,
+    JSON.stringify([stacked.rowCount, stacked.preview[0]]))
+  check('reports the folded header',
+    stacked.warnings.some(warning => warning.includes('continues the header')),
+    JSON.stringify(stacked.warnings))
+
+  const plainText = await callTool(tools, 'dataset_import_file', { path: 'stacked.xlsx', sheet: '明细' }, cwd)
+  check('keeps an all-text record under named headers as data',
+    plainText.rowCount === 1 && plainText.columnCount === 3 && plainText.preview[0]['公司'] === '甲公司',
+    JSON.stringify([plainText.rowCount, plainText.columns.map(column => column.name), plainText.preview[0]]))
 
   // 16. SQL guard
   check('accepts SELECT', assertReadOnlySql('SELECT * FROM t') === 'SELECT * FROM t')

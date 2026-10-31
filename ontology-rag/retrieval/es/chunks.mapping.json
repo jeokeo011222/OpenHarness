@@ -1,0 +1,43 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "refresh_interval": "5s",
+    "analysis": {
+      "analyzer": {
+        "zh_std": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["cjk_width", "lowercase", "cjk_bigram"]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "chunk_id": { "type": "keyword" },
+      "tenant_id": { "type": "keyword" },
+      "doc_id": { "type": "keyword" },
+      "doc_title": {
+        "type": "text",
+        "analyzer": "zh_std",
+        "fields": { "raw": { "type": "keyword" } }
+      },
+      "doc_type": { "type": "keyword" },
+      "clause_no": { "type": "keyword" },
+      "text": {
+        "type": "text",
+        "analyzer": "zh_std",
+        "fields": { "raw": { "type": "keyword", "ignore_above": 512 } }
+      },
+      "classes": { "type": "keyword" },
+      "properties": { "type": "keyword" },
+      "priority": { "type": "integer" },
+      "effective_from": { "type": "date", "format": "strict_date_optional_time||yyyy-MM-dd" },
+      "effective_to": { "type": "date", "format": "strict_date_optional_time||yyyy-MM-dd" },
+      "version": { "type": "keyword" },
+      "deprecated": { "type": "boolean" }
+    }
+  }
+}

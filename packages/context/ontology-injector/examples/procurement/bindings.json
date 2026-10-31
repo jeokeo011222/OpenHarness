@@ -1,0 +1,48 @@
+{
+  "objectTypes": [
+    {
+      "objectType": "PurchaseOrder",
+      "label": "采购订单",
+      "primaryKey": "poNumber",
+      "labelField": "poNumber",
+      "datasource": { "kind": "csv", "path": "orders.csv" },
+      "fields": [
+        { "name": "poNumber", "column": "poNumber", "type": "string", "filterable": true },
+        { "name": "supplierCode", "column": "supplierCode", "type": "string", "filterable": true },
+        { "name": "status", "column": "status", "type": "string", "filterable": true },
+        { "name": "amount", "column": "amount", "type": "decimal", "filterable": true },
+        { "name": "region", "column": "region", "type": "string", "filterable": true }
+      ]
+    },
+    {
+      "objectType": "Supplier",
+      "label": "供应商",
+      "primaryKey": "code",
+      "labelField": "name",
+      "datasource": { "kind": "csv", "path": "suppliers.csv" },
+      "fields": [
+        { "name": "code", "column": "code", "type": "string", "filterable": true },
+        { "name": "name", "column": "name", "type": "string", "searchable": true },
+        { "name": "region", "column": "region", "type": "string", "filterable": true }
+      ]
+    }
+  ],
+  "links": [
+    { "linkId": "poSupplier", "label": "下单给", "fromType": "PurchaseOrder", "toType": "Supplier", "fromProperty": "supplierCode", "toProperty": "code" }
+  ],
+  "actions": [
+    {
+      "actionId": "approvePurchaseOrder",
+      "label": "审批采购订单",
+      "targetObjectType": "PurchaseOrder",
+      "parameters": [{ "name": "comment", "type": "string" }],
+      "preconditions": [
+        { "kind": "equals", "property": "status", "value": "pending", "message": "只有待审批的订单可以审批" },
+        { "kind": "lessThan", "property": "amount", "value": "10000000", "message": "超过一千万需要走招标流程" },
+        { "kind": "linkExists", "linkId": "poSupplier", "message": "订单缺少供应商" }
+      ],
+      "effects": [{ "kind": "set-property", "property": "status", "value": "approved" }],
+      "approval": "required"
+    }
+  ]
+}

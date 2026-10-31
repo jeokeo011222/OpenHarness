@@ -1,0 +1,185 @@
+@prefix con:  <http://ontorag.local/contract#> .
+@prefix car:  <http://ontorag.local/carbon#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix doc:  <http://ontorag.local/doc#> .
+
+## ---------------------------------------------------------------------------
+## 输出闸门形状（claim shapes）
+##
+## 与 *_shapes.ttl 的分工：
+##   *_shapes.ttl      —— 数据质检 / 动作提交前校验「存量数据」是否合规
+##   claim_shapes.ttl  —— 生成后校验「模型结论」是否与事实自洽
+##
+## 这样做是必要的：存量数据本身可能违规（例如历史超付），此时系统仍应能
+## 回答「这笔付款超了多少」，而不是拒绝服务。闸门要拦的是「错误结论」。
+## ---------------------------------------------------------------------------
+
+con: a owl:Ontology ;
+    rdfs:label "输出结论校验形状"@zh .
+
+## ---------- 1. 付款结论必须与合同剩余应付款一致 ----------
+
+con:PaymentVerdictConsistency
+    a sh:NodeShape ;
+    rdfs:label "付款结论自洽"@zh ;
+    sh:targetSubjectsOf con:paymentVerdict ;
+    sh:sparql [
+        sh:message "结论与事实冲突：{?this} 断言 {?verdict}，但申请额 {?amount} 与剩余应付 {?remaining} 不符" ;
+        sh:prefixes con: ;
+        sh:select """
+            SELECT $this ?verdict ?amount ?remaining
+            WHERE {
+                $this con:paymentVerdict ?verdict ;
+                      con:paymentAmount ?amount ;
+                      con:appliesToContract ?contract .
+                ?contract con:contractAmount ?total .
+                OPTIONAL { ?contract con:paidAmount ?paid0 }
+                OPTIONAL { ?contract con:retentionRate ?retention0 }
+                BIND(COALESCE(?paid0, 0) AS ?paid)
+                BIND(COALESCE(?retention0, 0) AS ?retention)
+                # 显式 xsd:decimal 转换不是洁癖：未带类型标注的数字字面量，
+                # rdflib 会做隐式数值提升，Jena 直接抛类型错误、FILTER 变假。
+                # 两个引擎因此会对同一条数据给出不同结论，而且是「漏报违规」
+                # 这种最危险的方向。强制转换让两边落到同一语义上。
+                BIND(xsd:decimal(?total) * (1 - xsd:decimal(?retention))
+                     - xsd:decimal(?paid) AS ?remaining)
+                FILTER(
+                    (?verdict = "within-remaining" && xsd:decimal(?amount) > ?remaining) ||
+                    (?verdict = "exceeds-remaining" && xsd:decimal(?amount) <= ?remaining)
+                )
+            }
+            """ ;
+    ] .
+
+## ---------- 2. 边界结论必须与互斥事实一致 ----------
+
+car:BoundaryVerdictConsistency
+    a sh:NodeShape ;
+    rdfs:label "边界结论自洽"@zh ;
+    sh:targetSubjectsOf car:boundaryVerdict ;
+    sh:sparql [
+        sh:message "结论与事实冲突：{?this} 断言 {?verdict}，但同组边界数量为 {?count}" ;
+        sh:prefixes car: ;
+        sh:select """
+            SELECT $this ?verdict (COUNT(DISTINCT ?boundary) AS ?count)
+            WHERE {
+                $this car:boundaryVerdict ?verdict .
+                OPTIONAL {
+                    $this car:belongsToBoundary ?boundary .
+                    ?boundary car:exclusivityGroup ?group .
+                }
+            }
+            GROUP BY $this ?verdict
+            HAVING (
+                (?verdict = "exclusive" && COUNT(DISTINCT ?boundary) > 1) ||
+                (?verdict = "conflicting" && COUNT(DISTINCT ?boundary) <= 1)
+            )
+            """ ;
+    ] .
+
+## ---------- 3. 核算结论必须能由活动数据与因子复算 ----------
+
+car:EmissionClaimConsistency
+    a sh:NodeShape ;
+    rdfs:label "核算结论可复算"@zh ;
+    sh:targetSubjectsOf car:claimedEmission ;
+    sh:sparql [
+        sh:message "核算结论不可复算：{?this} 断言 {?claimed}，按活动数据与因子应为 {?computed}" ;
+        sh:prefixes car: ;
+        sh:select """
+            SELECT $this ?claimed ?computed
+            WHERE {
+                $this car:claimedEmission ?claimed ;
+                      car:activityData ?activity ;
+                      car:usesFactor ?factor .
+                ?factor car:factorValue ?factorValue .
+                OPTIONAL { ?factor car:gwp ?gwpValue }
+                # 同上：强制数值化，避免 rdflib 与 Jena 在未标注字面量上分叉
+                BIND(xsd:decimal(?activity) * xsd:decimal(?factorValue)
+                     * COALESCE(xsd:decimal(?gwpValue), 1) AS ?computed)
+                FILTER(ABS(xsd:decimal(?claimed) - ?computed)
+                       > (0.01 * ABS(?computed) + 0.0001))
+            }
+            """ ;
+    ] .
+
+## ---------- 4. 结论必须标注依据的 chunk（可溯源） ----------
+
+con:VerdictRequiresEvidence
+    a sh:NodeShape ;
+    rdfs:label "结论必须挂在证据分块上"@zh ;
+    sh:targetSubjectsOf con:paymentVerdict ;
+    sh:property [
+        sh:path doc:basedOnChunk ;
+        sh:minCount 1 ;
+        sh:message "结论 {?this} 未标注依据分块，不可溯源" ;
+    ] .
+
+car:BoundaryVerdictRequiresEvidence
+    a sh:NodeShape ;
+    rdfs:label "边界结论必须挂在证据分块上"@zh ;
+    sh:targetSubjectsOf car:boundaryVerdict ;
+    sh:property [
+        sh:path doc:basedOnChunk ;
+        sh:minCount 1 ;
+        sh:message "结论 {?this} 未标注依据分块，不可溯源" ;
+    ] .
+
+## ===========================================================================
+## 提示级形状（sh:severity sh:Warning）
+##
+## 与上面四个形状的区别只在后果：Warning 进报告但不阻断，
+## Violation 直接拦掉整条回答。
+##
+## 这个分级必须真的用起来，否则闸门会退化成"要么全过要么全拦"：
+## 前者等于没有闸门，后者会让业务在遇到"数据看着不太对"时绕开系统。
+## 判据是：**错的是事实就 Violation，只是在提醒风险就 Warning**。
+## ===========================================================================
+
+## ---------- 5. 质保金比例落在常见区间外（提示） ----------
+
+con:RetentionRateAdvisory
+    a sh:NodeShape ;
+    rdfs:label "质保金比例提示"@zh ;
+    sh:severity sh:Warning ;
+    sh:targetClass con:Contract ;
+    sh:sparql [
+        sh:message "合同 {?this} 的质保金比例 {?retention} 超出常见区间 0–10%，建议核对合同条款" ;
+        sh:prefixes con: ;
+        sh:select """
+            SELECT $this ?retention
+            WHERE {
+                $this con:retentionRate ?retention .
+                FILTER(xsd:decimal(?retention) < 0 || xsd:decimal(?retention) > 0.10)
+            }
+            """ ;
+    ] .
+
+## ---------- 6. 核算结论依据的因子缺少 GWP（提示） ----------
+
+## 目标必须是"有结论的主体"，而不是"有因子值的任何节点"：
+## 后者会让一条与排放无关的付款问题也收到排放提示，警告一旦变成背景噪声，
+## 真正的警告就没人看了。
+
+car:EmissionClaimFactorAdvisory
+    a sh:NodeShape ;
+    rdfs:label "核算因子 GWP 缺失提示"@zh ;
+    sh:severity sh:Warning ;
+    sh:targetSubjectsOf car:claimedEmission ;
+    sh:sparql [
+        sh:message "结论 {?this} 依据的排放因子 {?factor} 未给出 GWP，核算按 1 计算，结果可能偏低" ;
+        sh:prefixes car: ;
+        sh:select """
+            SELECT $this ?factor
+            WHERE {
+                $this car:claimedEmission ?claimed ;
+                      car:usesFactor ?factor .
+                FILTER NOT EXISTS { ?factor car:gwp ?any }
+            }
+            """ ;
+    ] .
+

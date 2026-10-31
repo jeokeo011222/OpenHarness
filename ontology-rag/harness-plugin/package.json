@@ -1,0 +1,26 @@
+{
+  "name": "@deepseek-ai/dsh-ontology-rag-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DeepSeek Harness 插件：把 OntoRAG 的三级检索与 SHACL 闸门接进 agent 生命周期",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.json"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-agent": "*",
+    "@deepseek-ai/dsh-llm": "*",
+    "@deepseek-ai/dsh-session": "*",
+    "@deepseek-ai/dsh-tools": "*",
+    "@deepseek-ai/schemastery": "*"
+  }
+}

@@ -1,0 +1,144 @@
+@prefix con:  <http://ontorag.local/contract#> .
+@prefix car:  <http://ontorag.local/carbon#> .
+@prefix top:  <http://ontorag.local/top#> .
+@prefix doc:  <http://ontorag.local/doc#> .
+@prefix inst: <http://ontorag.local/tenant/demo/contract#> .
+@prefix cain: <http://ontorag.local/tenant/demo/carbon#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+## ---------------------------------------------------------------------------
+## 演示租户 demo 的实例数据（A-Box）
+##
+## 场景一：C-2024-001 剩余应付 = 1000万 × (1-5%) - 400万 = 550万，
+##         PAY-1001 申请 700万 → 超付；PAY-1002 申请 100万 → 未超付。
+## 场景二：S-BOILER 同时归属两个互斥边界 → 边界冲突。
+## ---------------------------------------------------------------------------
+
+## ------------------------------ 合同 ------------------------------
+
+inst:C-2024-001 a con:Contract ;
+    top:identifier "C-2024-001" ;
+    rdfs:label "2024 年设备采购合同" ;
+    con:contractAmount "10000000"^^xsd:decimal ;
+    con:paidAmount "4000000"^^xsd:decimal ;
+    con:retentionRate "0.05"^^xsd:decimal ;
+    con:contractStatus "active" ;
+    con:signedWith inst:SUP-A ;
+    doc:evidence con:clause-3 , con:clause-4 .
+
+inst:C-2024-002 a con:Contract ;
+    top:identifier "C-2024-002" ;
+    rdfs:label "2023 年运维服务合同" ;
+    con:contractAmount "3000000"^^xsd:decimal ;
+    con:paidAmount "3000000"^^xsd:decimal ;
+    con:retentionRate "0"^^xsd:decimal ;
+    con:contractStatus "closed" ;
+    con:signedWith inst:SUP-B .
+
+inst:SUP-A a con:Supplier ;
+    top:identifier "SUP-A" ;
+    rdfs:label "华东重型设备有限公司" .
+
+inst:SUP-B a con:Supplier ;
+    top:identifier "SUP-B" ;
+    rdfs:label "华南运维服务有限公司" .
+
+## ------------------------------ 付款 ------------------------------
+
+inst:PAY-1001 a con:PaymentApplication ;
+    top:identifier "PAY-1001" ;
+    rdfs:label "设备到货款" ;
+    con:paymentAmount "7000000"^^xsd:decimal ;
+    con:paymentStatus "submitted" ;
+    con:appliesToContract inst:C-2024-001 ;
+    con:hasInvoice inst:INV-1001 ;
+    doc:evidence con:clause-3 , con:clause-4 .
+
+inst:PAY-1002 a con:PaymentApplication ;
+    top:identifier "PAY-1002" ;
+    rdfs:label "设备预付款" ;
+    con:paymentAmount "1000000"^^xsd:decimal ;
+    con:paymentStatus "paid" ;
+    con:appliesToContract inst:C-2024-001 ;
+    doc:evidence con:clause-3 .
+
+inst:PAY-1003 a con:PaymentApplication ;
+    top:identifier "PAY-1003" ;
+    rdfs:label "运维尾款" ;
+    con:paymentAmount "500000"^^xsd:decimal ;
+    con:paymentStatus "draft" ;
+    con:appliesToContract inst:C-2024-002 ;
+    doc:evidence con:clause-7 .
+
+inst:INV-1001 a con:Invoice ;
+    top:identifier "INV-1001" ;
+    con:invoiceNo "3100231130-001" ;
+    con:invoiceAmount "8000000"^^xsd:decimal .
+
+## ------------------------------ 条款锚点 ------------------------------
+
+con:clause-3 a con:ContractClause ;
+    con:clauseNo "第三条" ;
+    doc:chunkId "contract_policy#第三条" .
+
+con:clause-4 a con:ContractClause ;
+    con:clauseNo "第四条" ;
+    doc:chunkId "contract_policy#第四条" .
+
+con:clause-7 a con:ContractClause ;
+    con:clauseNo "第七条" ;
+    doc:chunkId "contract_policy#第七条" .
+
+## ------------------------------ 碳核算 ------------------------------
+
+cain:B-2024-OPS a car:AccountingBoundary ;
+    rdfs:label "2024 运营控制边界" ;
+    car:boundaryApproach "operational" ;
+    car:exclusivityGroup "group-2024" ;
+    doc:evidence cain:clause-5 .
+
+cain:B-2024-FIN a car:AccountingBoundary ;
+    rdfs:label "2024 财务控制边界" ;
+    car:boundaryApproach "financial" ;
+    car:exclusivityGroup "group-2024" ;
+    doc:evidence cain:clause-5 .
+
+cain:S-BOILER a car:EmissionSource ;
+    rdfs:label "1 号燃气锅炉" ;
+    car:sourceType "stationary" ;
+    car:belongsToBoundary cain:B-2024-OPS , cain:B-2024-FIN ;
+    doc:evidence cain:clause-5 .
+
+cain:S-FLEET a car:EmissionSource ;
+    rdfs:label "厂区运输车队" ;
+    car:sourceType "mobile" ;
+    car:belongsToBoundary cain:B-2024-OPS ;
+    doc:evidence cain:clause-5 .
+
+cain:F-DIESEL a car:EmissionFactor ;
+    rdfs:label "柴油排放因子" ;
+    car:factorValue "2.63"^^xsd:decimal ;
+    car:gwp "1"^^xsd:decimal .
+
+cain:clause-5 a top:Clause ;
+    doc:chunkId "carbon_standard#5.4" .
+
+cain:clause-6 a top:Clause ;
+    doc:chunkId "carbon_standard#5.2" .
+
+cain:R-2024-001 a car:EmissionRecord ;
+    rdfs:label "1 号锅炉 2024 年 1 月排放" ;
+    car:activityData "1000"^^xsd:decimal ;
+    car:emissionAmount "2630"^^xsd:decimal ;
+    car:usesFactor cain:F-DIESEL ;
+    car:recordsSource cain:S-BOILER ;
+    doc:evidence cain:clause-6 .
+
+cain:R-2024-002 a car:EmissionRecord ;
+    rdfs:label "厂区车队 2024 年 1 月排放" ;
+    car:activityData "500"^^xsd:decimal ;
+    car:emissionAmount "2000"^^xsd:decimal ;
+    car:usesFactor cain:F-DIESEL ;
+    car:recordsSource cain:S-FLEET ;
+    doc:evidence cain:clause-6 .

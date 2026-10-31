@@ -1,0 +1,62 @@
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix con:  <http://ontorag.local/contract#> .
+@prefix car:  <http://ontorag.local/carbon#> .
+@prefix top:  <http://ontorag.local/top#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+## ---------------------------------------------------------------------------
+## 术语同义词库（实体链接与 Query 归一化的唯一事实来源）
+##
+## 用法：ontology_entity_link 工具和 pre_retrieval_hook 都从本文件加载别名，
+## 保证「请款单」「付款单」「付款申请」被归一到同一个类上。
+## 新增别名只改这里，不要在代码里写同义词表。
+## ---------------------------------------------------------------------------
+
+con:Contract
+    skos:altLabel "合同" , "合约" , "协议" , "合同文本" , "contract" .
+
+con:PaymentApplication
+    skos:altLabel "付款申请" , "请款单" , "付款单" , "请款" , "付款" , "payment application" .
+
+con:Invoice
+    skos:altLabel "发票" , "增值税发票" , "专票" , "invoice" .
+
+con:Supplier
+    skos:altLabel "供应商" , "乙方" , "承包方" , "供货方" , "vendor" .
+
+con:contractAmount
+    skos:altLabel "合同金额" , "合同总额" , "合同价款" , "合同总价" .
+
+con:paidAmount
+    skos:altLabel "已付金额" , "累计付款" , "已支付" , "已付款" .
+
+con:retentionRate
+    skos:altLabel "质保金比例" , "质保金" , "尾款比例" .
+
+con:paymentAmount
+    skos:altLabel "付款金额" , "申请金额" , "请款金额" .
+
+car:EmissionSource
+    skos:altLabel "排放源" , "排放单元" , "碳源" , "emission source" .
+
+car:AccountingBoundary
+    skos:altLabel "核算边界" , "边界" , "组织边界" , "boundary" .
+
+car:EmissionRecord
+    skos:altLabel "排放记录" , "排放数据" , "碳排数据" .
+
+car:EmissionFactor
+    skos:altLabel "排放因子" , "碳排因子" , "factor" .
+
+car:emissionAmount
+    skos:altLabel "排放量" , "碳排放量" , "tCO2e" .
+
+car:boundaryApproach
+    skos:altLabel "合并方式" , "核算方法" , "边界方法" .
+
+top:Document
+    skos:altLabel "文档" , "制度" , "文件" , "规范" .
+
+top:Clause
+    skos:altLabel "条款" , "条" , "款" , "clause" .

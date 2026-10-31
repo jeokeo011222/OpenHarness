@@ -19,6 +19,16 @@
   gap: 16px;
 }
 
+/* The scope seat sits inline with Reload: the two are the page's own controls,
+   and the seat's 28px floor keeps them on one baseline. */
+.headerActions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .title {
   margin: 0;
   font-size: 20px;

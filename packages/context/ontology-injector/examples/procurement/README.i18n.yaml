@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/context/ontology-injector/examples/procurement/README.md
+/object-layer-example-purchase-orders:
+  en: 8311e53533f9eb1f
+  zh: 197cd6059b1b994b
+/object-layer-example-purchase-orders/files:
+  en: e24c07825a7eec18
+  zh: 4f283d71b245b34c
+/object-layer-example-purchase-orders/walk-through-it:
+  en: 1bc7c3c649606b8e
+  zh: e2c9e05612698d28
+/object-layer-example-purchase-orders/expected-result:
+  en: 88ef1586a07c3544
+  zh: 3633aa4e3b19c831
+/object-layer-example-purchase-orders/three-hard-rules-for-actions:
+  en: 1ebdaac01742ebfd
+  zh: 02626720d08a7aea

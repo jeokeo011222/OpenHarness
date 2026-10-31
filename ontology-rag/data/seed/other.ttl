@@ -1,0 +1,31 @@
+@prefix con:  <http://ontorag.local/contract#> .
+@prefix top:  <http://ontorag.local/top#> .
+@prefix doc:  <http://ontorag.local/doc#> .
+@prefix inst: <http://ontorag.local/tenant/other/contract#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+## ---------------------------------------------------------------------------
+## 第二个租户 other：仅用于验证跨租户隔离。
+## demo 的查询绝不能命中这里的合同或分块。
+## ---------------------------------------------------------------------------
+
+inst:C-OTHER-001 a con:Contract ;
+    top:identifier "C-OTHER-001" ;
+    rdfs:label "其他租户的保密合同" ;
+    con:contractAmount "1000000"^^xsd:decimal ;
+    con:paidAmount "0"^^xsd:decimal ;
+    con:retentionRate "0"^^xsd:decimal ;
+    con:contractStatus "active" ;
+    doc:evidence con:other-clause .
+
+inst:PAY-OTHER-001 a con:PaymentApplication ;
+    top:identifier "PAY-OTHER-001" ;
+    con:paymentAmount "2000000"^^xsd:decimal ;
+    con:paymentStatus "submitted" ;
+    con:appliesToContract inst:C-OTHER-001 ;
+    doc:evidence con:other-clause .
+
+con:other-clause a con:ContractClause ;
+    con:clauseNo "第一条" ;
+    doc:chunkId "other_policy#第一条" .

@@ -1,0 +1,252 @@
+@prefix pay:  <http://ontorag.local/payment#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+
+## ===========================================================================
+## 合同付款风控 SHACL 规则（对应 payment_risk.owl.ttl）
+##
+## 严重级别约定（与项目闸门一致）：
+##   sh:Violation —— 阻断。该结论不允许出现在回答里，任务直接失败。
+##   sh:Warning   —— 提示。进入报告但不阻断：证据不足，需要人补数据。
+##
+## 为什么第 3 条规则拆成「阻断 + 告警」两条：
+##   "合同关闭后不得新增付款"是**时间相关**的约束。若只用 `sh:maxCount 0`
+##   表达"关闭的合同不能再有付款申请"，那么关闭前的历史付款也会被一起判违规，
+##   闸门从此对每一笔老付款报错——真问题反而被噪声淹没。
+##   所以按证据强度分级：
+##     · 有 appliedAt 和 closedAt 且 appliedAt >= closedAt → 有证据，阻断；
+##     · 时间线缺字段、无法证明先后             → 无证据，告警。
+##   "无法证明"不升级为阻断，是因为大量存量合同没有 closedAt；但也不能当作合规。
+##
+## 金额与时间的类型纪律（两条都踩过坑，不是洁癖）：
+##   1. 金额用 isNumeric() 而不是 sh:datatype xsd:decimal。Turtle 里 `10000000`
+##      自然写成 xsd:integer，硬比 xsd:decimal 会把正常数据判成违规。
+##   2. 时间在比较前统一归一化：只给日期（2026-05-10）时补 T00:00:00 再转
+##      xsd:dateTime。否则 `xsd:dateTime("2026-05-10")` 抛错 → FILTER 变假 →
+##      整行被丢弃 → **违规被静默漏报**（最危险的方向）。
+## ===========================================================================
+
+pay:ShapeSpec a owl:Ontology ;
+    rdfs:label "合同付款风控 SHACL 规则集"@zh , "Contract payment risk SHACL shapes"@en ;
+    owl:versionInfo "1.0.0" .
+
+## ---------------------------------------------------------------------------
+## 约束 1：付款申请金额 ≤ 合同剩余应付
+##
+## 剩余应付 = 合同额 ×(1 - 质保金比例) - 已付。
+## 若租户已物化 pay:remainingPayableAmount，则优先取物化值（COALESCE 第一个分支）。
+## ---------------------------------------------------------------------------
+
+pay:AppliedAmountWithinRemaining
+    a sh:NodeShape ;
+    rdfs:label "付款申请不得超过合同剩余应付"@zh , "Applied amount within remaining payable"@en ;
+    sh:severity sh:Violation ;
+    sh:targetClass pay:PaymentApplication ;
+    sh:sparql [
+        sh:message "超付风险：付款申请 {?this} 申请 {?applied} 元，但合同 {?contract} 剩余应付仅 {?remaining} 元（合同额 {?total}，已付 {?paid}，质保金比例 {?retention}）" ;
+        sh:select """
+            SELECT $this ?applied ?contract ?remaining ?total ?paid ?retention
+            WHERE {
+                $this pay:againstContract ?contract ;
+                      pay:appliedAmount ?applied .
+                ?contract pay:contractAmount ?total .
+                OPTIONAL { ?contract pay:paidAmount ?paid0 }
+                OPTIONAL { ?contract pay:retentionRate ?retention0 }
+                OPTIONAL { ?contract pay:remainingPayableAmount ?stated }
+                BIND(COALESCE(?paid0, 0) AS ?paidRaw)
+                BIND(COALESCE(?retention0, 0) AS ?retentionRaw)
+                BIND(xsd:decimal(?paidRaw) AS ?paid)
+                BIND(xsd:decimal(?retentionRaw) AS ?retention)
+                BIND(COALESCE(xsd:decimal(?stated),
+                              xsd:decimal(?total) * (1 - ?retention) - ?paid) AS ?remaining)
+                FILTER(xsd:decimal(?applied) > ?remaining)
+            }
+            """ ;
+    ] .
+
+## ---------------------------------------------------------------------------
+## 约束 2：付款申请必须且只能关联一份有效合同
+##
+## "有效"分两层，各自由独立的约束负责，避免一条规则同时管两件事：
+##   · 结构与类型（本 shape）：恰好一条边，且目标是 pay:Contract 实例；
+##   · 业务有效性（约束 3/4）：目标合同未关闭。
+## sh:class 顺带覆盖了「指向一个字符串字面量」的情形：字面量不可能 a pay:Contract。
+## ---------------------------------------------------------------------------
+
+pay:PaymentApplicationExactlyOneContract
+    a sh:NodeShape ;
+    rdfs:label "付款申请必须且只能关联一份有效合同"@zh , "Exactly one contract per application"@en ;
+    sh:severity sh:Violation ;
+    sh:targetClass pay:PaymentApplication ;
+    sh:property [
+        sh:path pay:againstContract ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "合同关联不合法：付款申请 {?this} 必须且只能关联一份合同（0 份即无付款依据，多份则无法确定扣减哪份合同）" ;
+    ] ;
+    sh:property [
+        sh:path pay:againstContract ;
+        sh:class pay:Contract ;
+        sh:message "合同关联无效：付款申请 {?this} 关联的对象不是 pay:Contract 实例" ;
+    ] .
+
+## ---------------------------------------------------------------------------
+## 约束 3：合同已关闭后不得新增付款申请（有证据 → 阻断）
+## ---------------------------------------------------------------------------
+
+pay:ClosedContractAcceptsNoNewApplication
+    a sh:NodeShape ;
+    rdfs:label "已关闭合同不得新增付款申请"@zh , "No new application against a closed contract"@en ;
+    sh:severity sh:Violation ;
+    sh:targetClass pay:PaymentApplication ;
+    sh:sparql [
+        sh:message "状态冲突：付款申请 {?this} 于 {?appliedAt} 提交，但合同 {?contract} 已于 {?closedAt} 关闭" ;
+        sh:select """
+            SELECT $this ?contract ?appliedAt ?closedAt
+            WHERE {
+                $this pay:againstContract ?contract ;
+                      pay:appliedAt ?appliedAt .
+                ?contract pay:status ?status ;
+                          pay:closedAt ?closedAt .
+                FILTER(?status IN (pay:StatusClosed, "closed"))
+                BIND(IF(STRLEN(STR(?appliedAt)) = 10,
+                        xsd:dateTime(CONCAT(STR(?appliedAt), "T00:00:00")),
+                        xsd:dateTime(?appliedAt)) AS ?atTime)
+                BIND(IF(STRLEN(STR(?closedAt)) = 10,
+                        xsd:dateTime(CONCAT(STR(?closedAt), "T00:00:00")),
+                        xsd:dateTime(?closedAt)) AS ?closeTime)
+                FILTER(?atTime >= ?closeTime)
+            }
+            """ ;
+    ] .
+
+## ---------------------------------------------------------------------------
+## 约束 3'：合同已关闭但时间线不可判定（无证据 → 告警）
+##
+## 触发条件：合同状态为 closed，但缺少 closedAt 或缺少 appliedAt。
+## 不阻断，是因为存量数据普遍缺 closedAt；不沉默，是因为"无法证明合规"不等于合规。
+## ---------------------------------------------------------------------------
+
+pay:ClosedContractTimelineUnprovable
+    a sh:NodeShape ;
+    rdfs:label "已关闭合同缺少关闭时间或申请时间"@zh , "Closed contract without a usable timeline"@en ;
+    sh:severity sh:Warning ;
+    sh:targetClass pay:PaymentApplication ;
+    sh:sparql [
+        sh:message "证据不足：付款申请 {?this} 指向的合同 {?contract} 已关闭，但缺少关闭时间或申请时间，无法判定是否属于关闭后的新增付款" ;
+        sh:select """
+            SELECT $this ?contract ?appliedAt ?closedAt
+            WHERE {
+                $this pay:againstContract ?contract .
+                ?contract pay:status ?status .
+                OPTIONAL { ?contract pay:closedAt ?closedAt }
+                OPTIONAL { $this pay:appliedAt ?appliedAt }
+                FILTER(?status IN (pay:StatusClosed, "closed"))
+                FILTER(!BOUND(?closedAt) || !BOUND(?appliedAt))
+            }
+            """ ;
+    ] .
+
+## ---------------------------------------------------------------------------
+## 支撑约束 A：付款申请的必备字段
+##
+## 没有这两条，约束 1 与约束 3 就无从判定：缺金额则无从比较，缺时间则倾向
+## "无法证明"——而"无法证明"在闸门里会被当成无事发生。所以必备字段本身必须阻断。
+## ---------------------------------------------------------------------------
+
+pay:PaymentApplicationCoreFields
+    a sh:NodeShape ;
+    rdfs:label "付款申请必备字段"@zh , "Payment application required fields"@en ;
+    sh:severity sh:Violation ;
+    sh:targetClass pay:PaymentApplication ;
+    sh:property [
+        sh:path pay:appliedAmount ;
+        sh:minCount 1 ;
+        sh:message "付款申请 {?this} 缺少申请金额，无法判定是否超付" ;
+    ] ;
+    sh:property [
+        sh:path pay:appliedAt ;
+        sh:minCount 1 ;
+        sh:message "付款申请 {?this} 缺少申请时间，无法判定是否属于合同关闭后的新增付款" ;
+    ] ;
+    sh:sparql [
+        sh:message "类型错误：付款申请 {?this} 的申请金额 {?v} 不是数值" ;
+        sh:select """
+            SELECT $this ?v
+            WHERE { $this pay:appliedAmount ?v . FILTER(!isNumeric(?v)) }
+            """ ;
+    ] ;
+    sh:sparql [
+        sh:message "类型错误：付款申请 {?this} 的申请时间 {?v} 不是合法时间（需 xsd:dateTime 或 xsd:date）" ;
+        sh:select """
+            SELECT $this ?v
+            WHERE {
+                $this pay:appliedAt ?v .
+                FILTER(datatype(?v) NOT IN (xsd:dateTime, xsd:date))
+            }
+            """ ;
+    ] .
+
+## ---------------------------------------------------------------------------
+## 支撑约束 B：合同的必备字段与状态词表
+##
+## 状态同时接受 IRI（pay:StatusClosed）与 notation 字符串（"closed"）：前者是新
+## 数据的写法，后者是迁移期的存量写法。两种都能被规则理解，其余取值一律阻断——
+## 不做"不认识就放过"的兜底。
+## ---------------------------------------------------------------------------
+
+pay:ContractCoreFields
+    a sh:NodeShape ;
+    rdfs:label "合同必备字段与状态词表"@zh , "Contract required fields and status vocabulary"@en ;
+    sh:severity sh:Violation ;
+    sh:targetClass pay:Contract ;
+    sh:property [
+        sh:path pay:contractAmount ;
+        sh:minCount 1 ;
+        sh:message "合同 {?this} 缺少合同金额，剩余应付无法计算" ;
+    ] ;
+    sh:property [
+        sh:path pay:status ;
+        sh:minCount 1 ;
+        sh:message "合同 {?this} 缺少状态" ;
+    ] ;
+    sh:property [
+        sh:path pay:status ;
+        sh:in ( pay:StatusExecuting pay:StatusClosed pay:StatusTerminated pay:StatusSuspended
+                "executing" "closed" "terminated" "suspended" ) ;
+        sh:message "合同 {?this} 的状态不在受控词表内（应为 pay:ContractStatus 的个体或其 skos:notation）" ;
+    ] ;
+    sh:sparql [
+        sh:message "类型错误：合同 {?this} 的合同金额 {?v} 不是数值" ;
+        sh:select """
+            SELECT $this ?v
+            WHERE { $this pay:contractAmount ?v . FILTER(!isNumeric(?v)) }
+            """ ;
+    ] ;
+    sh:sparql [
+        sh:message "类型错误：合同 {?this} 的已付金额 {?v} 不是数值" ;
+        sh:select """
+            SELECT $this ?v
+            WHERE { $this pay:paidAmount ?v . FILTER(!isNumeric(?v)) }
+            """ ;
+    ] ;
+    sh:sparql [
+        sh:message "类型错误：合同 {?this} 的质保金比例 {?v} 不是数值" ;
+        sh:select """
+            SELECT $this ?v
+            WHERE { $this pay:retentionRate ?v . FILTER(!isNumeric(?v)) }
+            """ ;
+    ] ;
+    sh:sparql [
+        sh:message "类型错误：合同 {?this} 的关闭时间 {?v} 不是合法时间（需 xsd:dateTime 或 xsd:date）" ;
+        sh:select """
+            SELECT $this ?v
+            WHERE {
+                $this pay:closedAt ?v .
+                FILTER(datatype(?v) NOT IN (xsd:dateTime, xsd:date))
+            }
+            """ ;
+    ] .

@@ -1,0 +1,29 @@
+@prefix fuseki: <http://jena.apache.org/fuseki#> .
+@prefix tdb2:   <http://jena.apache.org/2016/tdb#> .
+@prefix ja:     <http://jena.hpl.hp.com/2005/11/Assembler#> .
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+
+## ---------------------------------------------------------------------------
+## Fuseki 数据集装配：TDB2 + 默认图合并查询
+##
+## 用 fuseki:serviceQuery / serviceUpdate / serviceReadWriteGraphStore 声明端点，
+## 不用 fuseki:endpoint + fuseki:operation —— 后者在 Fuseki 5.x 不会注册出可访问
+## 的 dispatch，表现为 /ontorag/query 返回 404 "No Fuseki dispatch"。
+##
+## unionDefaultGraph = true 的含义：查询可以不写 GRAPH，也能看到所有租户图。
+## 业务侧仍然强制 `FROM <租户图>`（见 sparql_guard.scope_to_tenant），
+## 这里是存储层能力，不是隔离手段。
+## ---------------------------------------------------------------------------
+
+<#service> a fuseki:Service ;
+    fuseki:name "ontorag" ;
+    fuseki:serviceQuery "query" , "sparql" ;
+    fuseki:serviceUpdate "update" , "sparql" ;
+    fuseki:serviceReadWriteGraphStore "data" ;
+    fuseki:serviceReadGraphStore "get" ;
+    fuseki:dataset <#dataset> .
+
+<#dataset> a tdb2:DatasetTDB2 ;
+    tdb2:location "/fuseki/databases/ontorag" ;
+    ja:context [ ja:cxtName "tdb2:unionDefaultGraph" ; ja:cxtValue true ] .

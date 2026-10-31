@@ -1,0 +1,176 @@
+@prefix top:  <http://ontorag.local/top#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix doc:  <http://ontorag.local/doc#> .
+
+## ---------------------------------------------------------------------------
+## 顶层通用本体（Top Ontology）
+##
+## 约束：只放「跨领域稳定」的概念。任何只在合同或碳核算里成立的属性，
+## 一律下沉到 Domain 层，避免顶层膨胀成万能字典。
+## 本文件使用 OWL 2 RL 可判定子集：无基数限制、无补类、无等价类链。
+## ---------------------------------------------------------------------------
+
+top: a owl:Ontology ;
+    rdfs:label "OntoRAG 顶层通用本体"@zh , "OntoRAG Top Ontology"@en ;
+    rdfs:comment "人员、组织、项目、文档、金额、时间等跨领域通用概念。"@zh ;
+    owl:versionInfo "1.0.0" .
+
+## ------------------------------ 类 ------------------------------
+
+top:Entity a owl:Class ;
+    rdfs:label "实体"@zh , "Entity"@en ;
+    rdfs:comment "一切可被唯一标识的业务对象的根类。"@zh .
+
+top:Person a owl:Class ;
+    rdfs:subClassOf top:Entity ;
+    rdfs:label "人员"@zh , "Person"@en .
+
+top:Organization a owl:Class ;
+    rdfs:subClassOf top:Entity ;
+    rdfs:label "组织"@zh , "Organization"@en .
+
+top:Project a owl:Class ;
+    rdfs:subClassOf top:Entity ;
+    rdfs:label "项目"@zh , "Project"@en .
+
+top:Document a owl:Class ;
+    rdfs:subClassOf top:Entity ;
+    rdfs:label "文档"@zh , "Document"@en ;
+    rdfs:comment "制度、合同、台账、国标等一切可作为证据的载体。"@zh .
+
+top:Clause a owl:Class ;
+    rdfs:subClassOf top:Entity ;
+    rdfs:label "条款"@zh , "Clause"@en ;
+    rdfs:comment "文档的最小业务单元，也是本体感知分块的最小单元。"@zh .
+
+top:MonetaryAmount a owl:Class ;
+    rdfs:subClassOf top:Entity ;
+    rdfs:label "金额"@zh , "Monetary amount"@en ;
+    rdfs:comment "以数值 + 币种表达，禁止用字符串承载金额。"@zh .
+
+top:TimePeriod a owl:Class ;
+    rdfs:subClassOf top:Entity ;
+    rdfs:label "时间区间"@zh , "Time period"@en .
+
+top:Regulation a owl:Class ;
+    rdfs:subClassOf top:Document ;
+    rdfs:label "制度/规范"@zh , "Regulation"@en ;
+    rdfs:comment "含企业内部制度与国标规范，靠 doc:priority 区分优先级。"@zh .
+
+## ------------------------------ 属性 ------------------------------
+
+top:identifier a owl:DatatypeProperty ;
+    rdfs:domain top:Entity ;
+    rdfs:range xsd:string ;
+    rdfs:label "业务主键"@zh .
+
+top:name a owl:DatatypeProperty ;
+    rdfs:domain top:Entity ;
+    rdfs:range xsd:string ;
+    rdfs:label "名称"@zh .
+
+top:belongsToProject a owl:ObjectProperty ;
+    rdfs:domain top:Entity ;
+    rdfs:range top:Project ;
+    rdfs:label "所属项目"@zh .
+
+top:ownedBy a owl:ObjectProperty ;
+    rdfs:domain top:Entity ;
+    rdfs:range top:Organization ;
+    rdfs:label "归属组织"@zh .
+
+top:hasDocument a owl:ObjectProperty ;
+    rdfs:domain top:Entity ;
+    rdfs:range top:Document ;
+    rdfs:label "关联文档"@zh .
+
+top:hasClause a owl:ObjectProperty ;
+    rdfs:domain top:Document ;
+    rdfs:range top:Clause ;
+    rdfs:label "包含条款"@zh .
+
+top:amountValue a owl:DatatypeProperty ;
+    rdfs:domain top:MonetaryAmount ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "金额数值"@zh .
+
+top:currency a owl:DatatypeProperty ;
+    rdfs:domain top:MonetaryAmount ;
+    rdfs:range xsd:string ;
+    rdfs:label "币种"@zh .
+
+top:effectiveFrom a owl:DatatypeProperty ;
+    rdfs:domain top:Document ;
+    rdfs:range xsd:date ;
+    rdfs:label "生效日期"@zh .
+
+top:effectiveTo a owl:DatatypeProperty ;
+    rdfs:domain top:Document ;
+    rdfs:range xsd:date ;
+    rdfs:label "失效日期"@zh .
+
+top:docPriority a owl:DatatypeProperty ;
+    rdfs:domain top:Document ;
+    rdfs:range xsd:integer ;
+    rdfs:label "文档优先级"@zh ;
+    rdfs:comment "数字越小越优先：10 现行制度 > 20 业务台账/合同 > 30 国标规范 > 40 历史资料。"@zh .
+
+## --------------------- SKOS 同义词挂钩（术语归一） ---------------------
+## 同义词实例放在 vocab/synonyms.ttl，顶层只声明挂载点。
+
+top:altLabel a owl:AnnotationProperty ;
+    rdfs:subPropertyOf skos:altLabel ;
+    rdfs:label "别名"@zh .
+
+## ---------------------------------------------------------------------------
+## SHACL 前缀声明：供各 shape 文件通过 sh:prefixes 引用
+## ---------------------------------------------------------------------------
+
+top: a owl:Ontology ;
+    sh:declare [
+        sh:prefix "top" ;
+        sh:namespace "http://ontorag.local/top#"^^xsd:anyURI ;
+    ] , [
+        sh:prefix "xsd" ;
+        sh:namespace "http://www.w3.org/2001/XMLSchema#"^^xsd:anyURI ;
+    ] , [
+        sh:prefix "rdf" ;
+        sh:namespace "http://www.w3.org/1999/02/22-rdf-syntax-ns#"^^xsd:anyURI ;
+    ] .
+
+## ---------------------------------------------------------------------------
+## 证据与分块词汇（doc:）
+##
+## 结论必须能回指到证据分块，否则 SHACL 会判定"不可溯源"并阻断输出。
+## ---------------------------------------------------------------------------
+
+doc:chunkId a owl:DatatypeProperty ;
+    rdfs:domain top:Entity ;
+    rdfs:range xsd:string ;
+    rdfs:label "分块 id"@zh .
+
+doc:basedOnChunk a owl:DatatypeProperty ;
+    rdfs:domain top:Entity ;
+    rdfs:range xsd:string ;
+    rdfs:label "依据分块"@zh .
+
+doc:docId a owl:DatatypeProperty ;
+    rdfs:domain top:Document ;
+    rdfs:range xsd:string ;
+    rdfs:label "文档 id"@zh .
+
+doc:sourcePath a owl:DatatypeProperty ;
+    rdfs:domain top:Document ;
+    rdfs:range xsd:string ;
+    rdfs:label "来源路径"@zh .
+
+doc:evidence a owl:ObjectProperty ;
+    rdfs:domain top:Entity ;
+    rdfs:range top:Clause ;
+    rdfs:label "证据条款"@zh ;
+    rdfs:comment "实例到条款的溯源边；条款再通过 doc:chunkId 指向检索分块。"@zh .

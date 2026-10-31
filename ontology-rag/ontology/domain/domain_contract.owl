@@ -1,0 +1,161 @@
+@prefix con:  <http://ontorag.local/contract#> .
+@prefix top:  <http://ontorag.local/top#> .
+@prefix doc:  <http://ontorag.local/doc#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+
+## ---------------------------------------------------------------------------
+## 领域本体：合同付款风控（Contract Payment Risk）
+##
+## 覆盖场景：
+##   1) 超付校验            —— 付款申请金额 ≤ 合同剩余应付
+##   2) 合同-发票-付款链路  —— 发票合计 ≤ 付款金额，且付款必须挂在合同上
+##   3) 合同状态守卫        —— 已关闭/已终止合同不得新增付款
+##
+## 建模原则：金额一律 xsd:decimal，不建 MonetaryAmount 中间节点，
+## 因为该领域的金额是「合同上的一个字段」，不是独立可引用的对象。
+## ---------------------------------------------------------------------------
+
+con: a owl:Ontology ;
+    rdfs:label "合同付款风控子本体"@zh , "Contract payment risk sub-ontology"@en ;
+    owl:versionInfo "1.0.0" ;
+    owl:imports <http://ontorag.local/top> .
+
+## ------------------------------ 类 ------------------------------
+
+con:Contract a owl:Class ;
+    rdfs:subClassOf top:Entity ;
+    rdfs:label "合同"@zh , "Contract"@en ;
+    rdfs:comment "合同主数据。金额字段为含税总额。"@zh .
+
+con:PaymentApplication a owl:Class ;
+    rdfs:subClassOf top:Entity ;
+    rdfs:label "付款申请"@zh , "Payment application"@en ;
+    rdfs:comment "发起付款的业务单据，必须挂在一份合同上。"@zh .
+
+con:Invoice a owl:Class ;
+    rdfs:subClassOf top:Entity ;
+    rdfs:label "发票"@zh , "Invoice"@en .
+
+con:Supplier a owl:Class ;
+    rdfs:subClassOf top:Organization ;
+    rdfs:label "供应商"@zh , "Supplier"@en .
+
+con:ContractClause a owl:Class ;
+    rdfs:subClassOf top:Clause ;
+    rdfs:label "合同条款"@zh , "Contract clause"@en ;
+    rdfs:comment "付款条件、违约责任等，是溯源引用的最小单元。"@zh .
+
+## ------------------------------ 对象属性 ------------------------------
+
+con:appliesToContract a owl:ObjectProperty ;
+    rdfs:domain con:PaymentApplication ;
+    rdfs:range con:Contract ;
+    rdfs:label "对应合同"@zh ;
+    owl:inverseOf con:hasPaymentApplication .
+
+con:hasPaymentApplication a owl:ObjectProperty ;
+    rdfs:domain con:Contract ;
+    rdfs:range con:PaymentApplication ;
+    rdfs:label "包含付款申请"@zh .
+
+con:hasInvoice a owl:ObjectProperty ;
+    rdfs:domain con:PaymentApplication ;
+    rdfs:range con:Invoice ;
+    rdfs:label "关联发票"@zh .
+
+con:signedWith a owl:ObjectProperty ;
+    rdfs:domain con:Contract ;
+    rdfs:range con:Supplier ;
+    rdfs:label "签约对方"@zh .
+
+con:hasClause a owl:ObjectProperty ;
+    rdfs:domain con:Contract ;
+    rdfs:range con:ContractClause ;
+    rdfs:label "合同条款"@zh .
+
+## ------------------------------ 数据属性 ------------------------------
+
+con:contractAmount a owl:DatatypeProperty ;
+    rdfs:domain con:Contract ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "合同金额"@zh .
+
+con:paidAmount a owl:DatatypeProperty ;
+    rdfs:domain con:Contract ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "已付金额"@zh .
+
+con:retentionRate a owl:DatatypeProperty ;
+    rdfs:domain con:Contract ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "质保金比例"@zh ;
+    rdfs:comment "0~1 之间的小数，剩余应付计算时需扣除质保金。"@zh .
+
+con:contractStatus a owl:DatatypeProperty ;
+    rdfs:domain con:Contract ;
+    rdfs:range xsd:string ;
+    rdfs:label "合同状态"@zh ;
+    rdfs:comment "active | closed | terminated。"@zh .
+
+con:paymentAmount a owl:DatatypeProperty ;
+    rdfs:domain con:PaymentApplication ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "付款申请金额"@zh .
+
+con:paymentStatus a owl:DatatypeProperty ;
+    rdfs:domain con:PaymentApplication ;
+    rdfs:range xsd:string ;
+    rdfs:label "付款状态"@zh ;
+    rdfs:comment "draft | submitted | approved | paid | rejected。"@zh .
+
+con:invoiceAmount a owl:DatatypeProperty ;
+    rdfs:domain con:Invoice ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "发票金额"@zh .
+
+con:invoiceNo a owl:DatatypeProperty ;
+    rdfs:domain con:Invoice ;
+    rdfs:range xsd:string ;
+    rdfs:label "发票号"@zh .
+
+con:clauseNo a owl:DatatypeProperty ;
+    rdfs:domain con:ContractClause ;
+    rdfs:range xsd:string ;
+    rdfs:label "条款号"@zh .
+
+## 结论型属性：只允许 LLM 以「结论」形式断言，由 SHACL 反向校验结论是否成立。
+## 例：断言 within-remaining 时，金额必须真的不超过剩余应付。
+con:paymentVerdict a owl:DatatypeProperty ;
+    rdfs:domain con:PaymentApplication ;
+    rdfs:range xsd:string ;
+    rdfs:label "付款结论"@zh ;
+    rdfs:comment "within-remaining | exceeds-remaining | unknown。"@zh .
+
+## ------------------------- 术语同义词（实体链接用） -------------------------
+
+con:Contract skos:altLabel "合同" , "合约" , "协议" , "contract" .
+con:PaymentApplication skos:altLabel "付款申请" , "请款单" , "付款单" , "payment" .
+con:Invoice skos:altLabel "发票" , "增值税发票" , "invoice" .
+con:Supplier skos:altLabel "供应商" , "乙方" , "承包方" , "vendor" .
+con:contractAmount skos:altLabel "合同金额" , "合同总额" , "合同价款" .
+con:paidAmount skos:altLabel "已付金额" , "累计付款" , "已支付" .
+con:retentionRate skos:altLabel "质保金比例" , "质保金" , "尾款比例" .
+
+## ------------------------- SHACL 前缀声明 -------------------------
+
+con: a owl:Ontology ;
+    sh:declare [
+        sh:prefix "con" ;
+        sh:namespace "http://ontorag.local/contract#"^^xsd:anyURI ;
+    ] , [
+        sh:prefix "top" ;
+        sh:namespace "http://ontorag.local/top#"^^xsd:anyURI ;
+    ] , [
+        sh:prefix "xsd" ;
+        sh:namespace "http://www.w3.org/2001/XMLSchema#"^^xsd:anyURI ;
+    ] .

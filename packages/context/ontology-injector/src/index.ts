@@ -18,10 +18,25 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import z from '@deepseek-ai/schemastery'
-import { resolveInjectorConfig, fetchDomainSummary, domainIndexLine, wrapInjection } from './injector.ts'
+import { resolveInjectorConfig, fetchDomainSummary, domainIndexLine, wrapInjection, selectTurnDomains } from './injector.ts'
+import { latestUserText, findLabelConflict } from './mention.ts'
+import type { InjectionMode } from './injector.ts'
+import type { MentionCandidate } from './mention.ts'
 import { ONTOLOGY_BASELINE, ontologyDomainBindings, ontologyDomainOf } from './acl.ts'
 import { registerDomainSummaryTool } from './tools.ts'
 import { registerAnalyticsTools } from './analytics-tools.ts'
+import { registerComplianceTool, runCompliance } from './compliance.ts'
+import { objectIndexLine, registerObjectTools } from './objects/index.ts'
+import { chunkStats, ingestDocument, readChunks } from './retrieval/chunks.ts'
+import { loadLexicon } from './retrieval/lexicon.ts'
+import type {
+  ChunkLibraryStats,
+  EvidenceChunk,
+  IngestRequest,
+  TraceExample,
+  TraceResult,
+} from './retrieval/types.ts'
+import { DEMO_EXAMPLES, trace as traceQuestion } from './trace.ts'
 import {
   AnalyticsError,
   drilldownMetric as executeDrilldown,
@@ -32,6 +47,7 @@ import {
 import type { MetricDetail, MetricExplanation, MetricFilters, MetricRun, MetricSummary } from './analytics.ts'
 import { extractDocumentText } from './extract.ts'
 import { generateOntology } from './generate.ts'
+import type { GenerationSettings } from './generate.ts'
 import { OntologyDatabaseError, SCHEMA_VERSION } from './graph-db.ts'
 import { applyEdits as applyModelEdits, diffModels, emptyModel, emitTurtle, parseTurtle, patchToEdits, toGraph, OntologyModelError } from './model.ts'
 import type { OntologyModel } from './model.ts'
@@ -56,6 +72,7 @@ import {
   readDomainMeta,
   readLiveTurtle,
   readRegistry,
+  readShapesTurtle,
   readVersionTurtle,
   requireBatchId,
   requireDomainId,
@@ -64,6 +81,7 @@ import {
   writeInstanceGraph,
   writeLiveTurtle,
   writeRegistry,
+  writeShapes,
   writeSource,
   writeVersion,
 } from './store.ts'
@@ -73,6 +91,7 @@ import { validateOntology } from './validate.ts'
 import type {
   ApplyEditsResult,
   AuditEntry,
+  ComplianceReport,
   DomainUpdate,
   GenerateRequest,
   GenerateResult,
@@ -159,12 +178,17 @@ const DEFAULT_MAX_EVIDENCE_CHARS = 200
 /** Default cap on one instance Turtle import, in bytes. */
 const DEFAULT_MAX_INSTANCE_BYTES = 20 * 1024 * 1024
 
+/** Default source kinds whose messages must not trigger ontology injection. */
+const DEFAULT_SKIP_SOURCE_KINDS: readonly string[] = ['schedule']
+
 /** Ontology center configuration. */
 export interface Config {
   /** Root directory holding the graph database (`graph.db.nq`) and uploaded sources. */
   readonly storePath?: string
   /** Domains injected into each turn's first step; disabled or missing ids are skipped. */
   readonly defaultDomains?: string[]
+  /** Where a turn's domains come from: the message's `@` tokens (default) or `defaultDomains`. */
+  readonly injectionMode?: InjectionMode
   /** Character budget for one summary; the per-turn injection carries only a one-line index. */
   readonly maxSummaryChars?: number
   /** Extraction model name. */
@@ -181,6 +205,14 @@ export interface Config {
   readonly maxEvidenceChars?: number
   /** Extraction API key; defaults to `DEEPSEEK_API_KEY`. */
   readonly apiKey?: string
+  /** Message source kinds that must never trigger ontology injection on step 1.
+   *
+   * System-internal triggers (schedule reminders, automation callbacks, subagent
+   * reports) often reuse a user's Session with a self-contained prompt that
+   * knows nothing about the configured business domain. Listing those kinds
+   * here keeps the domain vocabulary out of turns that cannot use it.
+   * Defaults to `['schedule']`. */
+  readonly skipSourceKinds?: string[]
 }
 
 /** Host service behind the `ontologyStore` Remote namespace. */
@@ -190,6 +222,7 @@ export class OntologyStore extends TypertRemoteService {
   static Config: z<Config> = z.object({
     storePath: z.string(),
     defaultDomains: z.array(z.string()),
+    injectionMode: z.union([z.const('mention'), z.const('always')]).default('mention'),
     maxSummaryChars: z.natural().min(1),
     model: z.string().default(DEFAULT_MODEL),
     baseUrl: z.string().default(DEFAULT_BASE_URL),
@@ -198,11 +231,14 @@ export class OntologyStore extends TypertRemoteService {
     maxInstanceBytes: z.natural().min(1).default(DEFAULT_MAX_INSTANCE_BYTES),
     maxEvidenceChars: z.natural().min(1).default(DEFAULT_MAX_EVIDENCE_CHARS),
     apiKey: z.string(),
+    skipSourceKinds: z.array(z.string()).default([...DEFAULT_SKIP_SOURCE_KINDS]),
   })
 
   private readonly storePath: string
   private readonly defaultDomains: readonly string[]
+  private readonly injectionMode: InjectionMode
   private readonly maxSummaryChars: number
+  private readonly skipSourceKinds: ReadonlySet<string>
   private readonly model: string
   private readonly baseUrl: string
   private readonly maxClauses: number
@@ -225,7 +261,9 @@ export class OntologyStore extends TypertRemoteService {
     const injector = resolveInjectorConfig(config)
     this.storePath = injector.storePath
     this.defaultDomains = injector.defaultDomains
+    this.injectionMode = injector.injectionMode
     this.maxSummaryChars = injector.maxSummaryChars
+    this.skipSourceKinds = new Set(resolved.skipSourceKinds)
     this.model = resolved.model
     this.baseUrl = resolved.baseUrl
     this.maxClauses = resolved.maxClauses
@@ -234,8 +272,8 @@ export class OntologyStore extends TypertRemoteService {
     this.maxEvidenceChars = resolved.maxEvidenceChars
     this.apiKey = config.apiKey ?? process.env.DEEPSEEK_API_KEY
 
-    ctx.logger.info('[ontology-store] loaded (store=%s, defaultDomains=%s)',
-      this.storePath, injector.defaultDomains.join(',') || '<none>')
+    ctx.logger.info('[ontology-store] loaded (store=%s, mode=%s, defaultDomains=%s)',
+      this.storePath, injector.injectionMode, injector.defaultDomains.join(',') || '<none>')
 
     // Domain-scoped access resolves every call against the domain it names, so
     // Remote-access bindings never fall back to the shared global resource.
@@ -252,7 +290,16 @@ export class OntologyStore extends TypertRemoteService {
           bind: ontologyDomainBindings,
         })
         const baseline = scope.accountDirectory.acl.registerBaseline(() => ONTOLOGY_BASELINE)
+        // The permission form offers domain ids as a dictionary: an operator
+        // should never retype a domain id from memory and silently grant a
+        // resource that does not exist.
+        const catalog = scope.accountDirectory.catalog.register({
+          kind: 'ontology-domain',
+          label: '本体域',
+          list: async () => (await this.listDomains()).map(domain => ({ id: domain.id, label: domain.label })),
+        })
         return () => {
+          catalog()
           baseline()
           rule()
         }
@@ -263,6 +310,8 @@ export class OntologyStore extends TypertRemoteService {
     ctx.inject(['tools'], (scope) => {
       registerDomainSummaryTool(scope, { storePath: this.storePath, maxChars: this.maxSummaryChars })
       registerAnalyticsTools(scope, { storePath: this.storePath })
+      registerObjectTools(scope, { storePath: this.storePath })
+      registerComplianceTool(scope, { storePath: this.storePath })
     })
 
     /** Track last injected turn per session so we never double-inject. */
@@ -277,22 +326,52 @@ export class OntologyStore extends TypertRemoteService {
       if (decision.kind === 'reject' || signal.aborted) return decision
       if (step !== 1) return decision
 
+      // System-internal triggers (schedule reminders, automation callbacks)
+      // reuse a user's Session but must not inherit per-turn business-domain
+      // injection — the prompt is self-contained and knows nothing about the
+      // configured domains. `skipSourceKinds` defaults to `['schedule']`;
+      // deployments can extend it for other self-contained sources.
+      if (decision.messages.some(m => this.skipSourceKinds.has(m.source.kind))) return decision
+
       const lastInjected = injectedTurnBySession.get(agent.session)
       if (lastInjected === turn) return decision
 
-      if (this.defaultDomains.length === 0) return decision
+      // `mention` reads the turn's own user message, so a message without a
+      // domain token is a plain chat: no vocabulary, no tool hints, no fallback.
+      // The `@` test keeps the store read off the hot path for ordinary turns.
+      const mentionMode = this.injectionMode === 'mention'
+      const text = mentionMode ? latestUserText(decision.messages) : ''
+      if (mentionMode && !text.includes('@')) return decision
+
+      const picks = selectTurnDomains({
+        mode: this.injectionMode,
+        defaults: this.defaultDomains,
+        text,
+        domains: mentionMode ? await this.injectionCandidates() : [],
+      })
+      if (picks.length === 0) return decision
 
       const blocks: string[] = []
       const sections: { name: string; text: string }[] = []
-      for (const domain of this.defaultDomains) {
-        if (!await domainExists(this.storePath, domain)) continue
-        const meta = await readDomainMeta(this.storePath, domain)
+      for (const pick of picks) {
+        if (!await domainExists(this.storePath, pick.domain)) continue
+        const meta = await readDomainMeta(this.storePath, pick.domain)
         if (meta.disabled) continue
-        const summary = await fetchDomainSummary(this.storePath, domain)
+        const summary = await fetchDomainSummary(this.storePath, pick.domain)
         if (summary === undefined) continue
-        const text = domainIndexLine(meta.label, domain, summary)
-        blocks.push(wrapInjection(text, domain))
-        sections.push({ name: `ontology-injector/${domain}`, text })
+        const objectLine = objectIndexLine(this.storePath, pick.domain)
+        const index = domainIndexLine(meta.label, pick.domain, summary)
+        // `always` injects the vocabulary itself; `mention` keeps the full index
+        // so a freshly picked domain is usable without a second tool round-trip.
+        const body = objectLine.length === 0 ? index : `${index}\n${objectLine}`
+        // The file-reference prompt teaches the model that `@` introduces a
+        // path. A chosen domain must say otherwise in the same breath, or the
+        // model reads a file named after the domain instead of using it.
+        const note = pick.token.length === 0
+          ? ''
+          : `用户消息中的 ${pick.token} 指这个本体域，不是文件路径。`
+        blocks.push(wrapInjection(body, pick.domain, note))
+        sections.push({ name: `ontology-injector/${pick.domain}`, text: body })
       }
       if (blocks.length === 0) return decision
 
@@ -337,6 +416,7 @@ export class OntologyStore extends TypertRemoteService {
     if (ids.includes(domain) || await domainExists(this.storePath, domain)) {
       throw new RemoteError('ontology/invalid-request', `Domain already exists: ${domain}`, { reason: `Domain already exists: ${domain}` })
     }
+    await this.requireUniqueLabel(label, domain)
     const now = new Date().toISOString()
     this.writing.add(domain)
     try {
@@ -376,6 +456,9 @@ export class OntologyStore extends TypertRemoteService {
     }
     const meta = await readDomainMeta(this.storePath, domain)
     const label = typeof patch.label === 'string' ? patch.label.trim() : ''
+    // Only a real change is checked: re-saving the same label must not collide
+    // with the domain's own record.
+    if (label.length > 0 && label !== meta.label) await this.requireUniqueLabel(label, domain)
     const disabled = typeof patch.disabled === 'boolean' ? patch.disabled : meta.disabled
     this.writing.add(domain)
     try {
@@ -855,6 +938,115 @@ export class OntologyStore extends TypertRemoteService {
   }
 
   /**
+   * Run one question through the ontology-guided pipeline and return every stage.
+   *
+   * @param domain - registered domain id the question is scoped to.
+   * @param question - natural-language question.
+   * @param topK - evidence budget, `1..20`.
+   * @returns the full trace, including the gate verdict and the baseline.
+   */
+  @Remote
+  async retrievalTrace(domain: string, question: string, topK?: number): Promise<TraceResult> {
+    await this.requireDomainExists(domain)
+    const trimmed = question.trim()
+    if (trimmed.length < 2) {
+      throw new RemoteError('ontology/invalid-request', '问题太短，至少 2 个字符', { reason: 'question too short' })
+    }
+    return traceQuestion({
+      root: this.storePath,
+      domain,
+      question: trimmed,
+      topK: Math.min(20, Math.max(1, Math.round(topK ?? 5))),
+      model: this.modelSettings(),
+    })
+  }
+
+  /**
+   * Clause library statistics for a domain.
+   *
+   * @param domain - registered domain id.
+   * @returns document, chunk, and tagged-class counts.
+   */
+  @Remote
+  async retrievalLibrary(domain: string): Promise<ChunkLibraryStats> {
+    await this.requireDomainExists(domain)
+    return chunkStats(this.storePath, domain)
+  }
+
+  /**
+   * List the clause library, newest file order preserved.
+   *
+   * @param domain - registered domain id.
+   * @param limit - maximum clauses to return.
+   * @returns the clauses shown in the library tab.
+   */
+  @Remote
+  async retrievalChunks(domain: string, limit?: number): Promise<readonly EvidenceChunk[]> {
+    await this.requireDomainExists(domain)
+    const chunks = await readChunks(this.storePath, domain)
+    return chunks.slice(0, Math.max(1, Math.min(1000, Math.round(limit ?? 200))))
+  }
+
+  /**
+   * Import one document as tagged evidence clauses.
+   *
+   * Tags come from the domain vocabulary, not from the model, so a clause can
+   * only be labelled with classes the ontology already declares.
+   *
+   * @param request - document payload.
+   * @returns the document id and how many clauses were written.
+   */
+  @Remote
+  async retrievalIngest(request: IngestRequest): Promise<{ docId: string; added: number; total: number }> {
+    const domain = request.domain
+    await this.requireDomainExists(domain)
+    const text = request.text.trim()
+    if (text.length < 10) {
+      throw new RemoteError('ontology/invalid-request', '文档内容太短，至少 10 个字符', { reason: 'text too short' })
+    }
+    if (request.title.trim().length === 0) {
+      throw new RemoteError('ontology/invalid-request', '文档标题不能为空', { reason: 'title required' })
+    }
+    const lexicon = await loadLexicon(this.storePath, domain)
+    const result = await ingestDocument(this.storePath, domain, { ...request, text }, lexicon)
+    await appendAudit(this.storePath, {
+      action: 'instance-import',
+      domain,
+      detail: `导入证据文档「${request.title.trim()}」：${result.added} 条条款`,
+    })
+    return result
+  }
+
+  /**
+   * Demonstration questions.
+   *
+   * Static text, computed nowhere, so it needs neither a domain nor a store read.
+   *
+   * @returns the shipped examples.
+   */
+  @Remote
+  async retrievalExamples(): Promise<readonly TraceExample[]> {
+    return DEMO_EXAMPLES
+  }
+
+  /**
+   * Model connection for answer generation, or `null` to stay offline.
+   *
+   * @returns generation settings when an API key is configured.
+   */
+  private modelSettings(): GenerationSettings | null {
+    const apiKey = this.apiKey
+    if (apiKey === undefined || apiKey.length === 0) return null
+    return {
+      apiKey,
+      baseUrl: this.baseUrl,
+      model: this.model,
+      maxClauses: this.maxClauses,
+      maxEvidenceChars: this.maxEvidenceChars,
+    }
+  }
+
+  /**
    * List the metric catalog this deployment offers for a domain.
    *
    * @param domain - registered domain id the catalog is read for.
@@ -1053,6 +1245,87 @@ export class OntologyStore extends TypertRemoteService {
   }
 
   /**
+   * Replace a domain's SHACL shapes document.
+   *
+   * Shapes live in a dedicated named graph, not the live ontology graph: a
+   * workbench edit rewrites the live graph through the model, which cannot
+   * represent SHACL blank-node structures.
+   *
+   * @param domain - registered domain id.
+   * @param turtle - the shapes Turtle document.
+   * @param signal - cancellation from the Remote call.
+   * @returns the number of shape triples written.
+   * @throws {RemoteError} `ontology/not-found`, `ontology/busy`, or
+   * `ontology/import-failed` when the Turtle cannot be parsed.
+   */
+  @Remote
+  async importShapes(domain: string, turtle: string, signal: AbortSignal): Promise<number> {
+    await this.requireDomainExists(domain)
+    this.requireIdle(domain)
+    signal.throwIfAborted()
+    if (turtle.trim().length === 0) {
+      throw new RemoteError('ontology/import-failed', 'The shapes document is empty', { reason: 'Uploaded shapes have no Turtle' })
+    }
+    this.writing.add(domain)
+    let triples: number
+    try {
+      triples = await writeShapes(this.storePath, domain, turtle)
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      throw new RemoteError('ontology/import-failed', reason, { reason })
+    } finally {
+      this.writing.delete(domain)
+    }
+    signal.throwIfAborted()
+    await appendAudit(this.storePath, {
+      action: 'shapes-import',
+      domain,
+      detail: `导入 SHACL 形状（${triples} 条三元组）`,
+    })
+    return triples
+  }
+
+  /**
+   * Read a domain's SHACL shapes as Turtle.
+   *
+   * @param domain - registered domain id.
+   * @returns the shapes Turtle, or an empty string when the domain has no shapes.
+   * @throws {RemoteError} `ontology/not-found` when the domain does not exist.
+   */
+  @Remote
+  async exportShapes(domain: string): Promise<string> {
+    await this.requireDomainExists(domain)
+    return readShapesTurtle(this.storePath, domain)
+  }
+
+  /**
+   * Run the compliance report: every SHACL shape over every instance batch,
+   * tallied per rule.
+   *
+   * @param domain - registered domain id.
+   * @returns the per-rule violation counts and the shapes that could not run.
+   * @throws {RemoteError} `ontology/not-found` when the domain does not exist.
+   */
+  @Remote
+  async complianceReport(domain: string): Promise<ComplianceReport> {
+    await this.requireDomainExists(domain)
+    let report: ComplianceReport
+    try {
+      report = await runCompliance(this.storePath, domain)
+    } catch (error) {
+      this.fail(error, domain)
+    }
+    await appendAudit(this.storePath, {
+      action: 'compliance-run',
+      domain,
+      detail: report.conforms
+        ? `合规检查通过（${report.shapes} 个形状，${report.batches.length} 个批次）`
+        : `合规检查未通过：${report.rules.reduce((sum, rule) => sum + rule.violations, 0)} 条违规`,
+    })
+    return report
+  }
+
+  /**
    * Read the audit trail, newest first.
    *
    * @param limit - maximum entries to return; defaults to 50.
@@ -1104,6 +1377,43 @@ export class OntologyStore extends TypertRemoteService {
   private requireIdle(domain: string): void {
     if (this.writing.has(domain)) {
       throw new RemoteError('ontology/busy', `A write is already in flight for ${domain}`, { domain })
+    }
+  }
+
+  /**
+   * Every registered domain as the mention resolver sees it.
+   *
+   * Read on demand rather than cached: a rename or a disable in the ontology
+   * center must take effect on the next turn, and the store read is one small
+   * query set compared with the model call it precedes.
+   *
+   * @returns id, label, and enabled state per registered domain.
+   */
+  private async injectionCandidates(): Promise<MentionCandidate[]> {
+    const ids = await readRegistry(this.storePath)
+    const metas = await Promise.all(ids.map(id => readDomainMeta(this.storePath, id)))
+    return metas.map(meta => ({ id: meta.id, label: meta.label, disabled: meta.disabled }))
+  }
+
+  /**
+   * Refuse a label another domain already answers to.
+   *
+   * The `@label` token is how a turn selects a domain, so a duplicate label is
+   * not a cosmetic problem: the resolver would have to pick one arbitrarily.
+   *
+   * @param label - proposed display label; blank labels fall back to the id and are not checked.
+   * @param exceptId - domain being renamed.
+   */
+  private async requireUniqueLabel(label: string, exceptId?: string): Promise<void> {
+    const trimmed = label.trim()
+    if (trimmed.length === 0) return
+    const conflict = findLabelConflict(trimmed, await this.injectionCandidates(), exceptId)
+    if (conflict !== null) {
+      throw new RemoteError(
+        'ontology/invalid-request',
+        `Domain label already in use: ${trimmed} (conflicts with "${conflict}")`,
+        { reason: `Domain label already in use: ${trimmed}` },
+      )
     }
   }
 

@@ -1,0 +1,15 @@
+# 密钥与本地状态：一律不入库
+.env
+var/
+
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+backend/.pytest_cache/
+
+# TypeScript 构建产物
+harness-plugin/lib/
+
+# 迁移与初始化脚本的临时输出
+data/out/

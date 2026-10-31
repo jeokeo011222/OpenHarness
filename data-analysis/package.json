@@ -34,14 +34,23 @@
     "host/rest.js",
     "host/charts.js",
     "host/tools.js",
+    "host/importers.js",
+    "host/config-store.js",
+    "host/api.js",
     "host/util.js"
   ],
   "dsh": {
     "bundle": {
-      "patch": "./cordis.patch.yml"
+      "patch": [
+        "./cordis.patch.yml"
+      ]
     },
     "client": {
       "platform": "web"
     }
+  },
+  "optionalDependencies": {
+    "mysql2": "^3.24.6",
+    "pg": "^8.16.3"
   }
 }

@@ -3,7 +3,6 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { apply } from '../src/client/index.ts'
 import { AccountMenu } from '../src/client/AccountMenu.tsx'
 import { AdminWorkbench } from '../src/client/AdminWorkbench.tsx'
-import { AdminIcon } from '../src/client/AdminIcon.tsx'
 import { en, zh } from '../src/client/locales.ts'
 
 afterEach(() => { vi.unstubAllGlobals() })
@@ -81,17 +80,12 @@ it('registers the admin workbench surfaces for an admin session and reverses the
   const { ctx, registers, effects } = harness(async () => stateResponse(adminSession))
   apply(ctx as never)
   await settle()
-  expect(registers.map(register => register.options.name)).toEqual(['settings.launcher', 'main', 'sidebar.panellist'])
+  expect(registers.map(register => register.options.name)).toEqual(['settings.launcher', 'main'])
   const main = registers[1]!
   expect(main.options.key).toBe('admin')
   expect(main.component).toBe(AdminWorkbench)
   const injected = (main.options.inject as () => { t: (key: string) => string })()
   expect(injected.t('adminTitle')).toBe('adminTitle')
-  const row = registers[2]!
-  expect(row.options.id).toBe('admin')
-  expect(row.options.order).toBe(95)
-  expect(row.component).toBe(AdminIcon)
-  expect((row.options.label as () => string)()).toBe('userManagement')
   for (const dispose of [...effects].reverse()) dispose()
   for (const register of registers) expect(register.dispose).toHaveBeenCalledOnce()
 })

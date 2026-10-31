@@ -128,6 +128,78 @@ function checkIsolated(model: OntologyModel, warnings: ValidationIssue[]): void 
 }
 
 /**
+ * Strip what distinguishes two labels about the same concept.
+ *
+ * Extraction tends to qualify rather than merge: "合同（微调）" and
+ * "合同（二次微调）" are the same class to a reader and two classes to the store.
+ * Removing parenthetical qualifiers, punctuation, and case makes those collide.
+ * @param label - the declared `rdfs:label`.
+ * @returns the comparable core of the label.
+ */
+function normalizeLabel(label: string): string {
+  return label
+    .replace(/[（(][^）)]*[）)]/g, '')
+    .replace(/[\s\-_·・/、,，。.:：;；!！?？"'“”‘’]/g, '')
+    .toLowerCase()
+}
+
+/**
+ * Drop a trailing counter from an entity id.
+ * @param id - one class or property local name.
+ * @returns the id without its trailing digits.
+ */
+function stemId(id: string): string {
+  return id.replace(/\d+$/, '')
+}
+
+/**
+ * Warn about entities that read as the same concept.
+ *
+ * Two shapes show up in practice and neither is caught by an exact-label check:
+ * labels that differ only by a qualifier, and ids that differ only by a counter
+ * (`Contract` / `Contract2`). Both are how an ontology silently doubles itself,
+ * so both are worth a warning even though neither is strictly invalid.
+ * @param model - parsed ontology.
+ * @param warnings - collected advisory issues.
+ */
+function checkNearDuplicates(model: OntologyModel, warnings: ValidationIssue[]): void {
+  const byLabel = new Map<string, string[]>()
+  const byStem = new Map<string, string[]>()
+  for (const item of [...model.classes, ...model.properties]) {
+    const key = normalizeLabel(item.label)
+    if (key.length > 0) {
+      const list = byLabel.get(key) ?? []
+      list.push(item.id)
+      byLabel.set(key, list)
+    }
+    const stem = stemId(item.id)
+    if (stem.length > 0) {
+      const list = byStem.get(stem) ?? []
+      list.push(item.id)
+      byStem.set(stem, list)
+    }
+  }
+  for (const [label, list] of byLabel) {
+    const unique = [...new Set(list)]
+    if (unique.length < 2) continue
+    warnings.push(issue(
+      'near-duplicate-label',
+      `疑似同一概念的多个实体：“${label}” 被 ${unique.join('、')} 分别声明，请确认是否需要合并`,
+      unique[0],
+    ))
+  }
+  for (const [stem, list] of byStem) {
+    const unique = [...new Set(list)]
+    if (unique.length < 2) continue
+    warnings.push(issue(
+      'counter-suffixed-id',
+      `实体 id 仅靠数字后缀区分：${unique.join('、')}（共同前缀 ${stem}），通常是重复创建而非新概念`,
+      unique[0],
+    ))
+  }
+}
+
+/**
  * Validate one ontology's structure.
  * @param domain - the business domain id, used for the fallback namespace.
  * @param turtle - the Turtle document to validate.
@@ -155,5 +227,6 @@ export function validateOntology(domain: string, turtle: string): ValidationRepo
   checkProperties(model, classIds, errors, warnings)
   checkLabels(model, errors)
   checkIsolated(model, warnings)
+  checkNearDuplicates(model, warnings)
   return { errors, warnings }
 }

@@ -36,6 +36,7 @@ import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { installProxyFromEnvironment } from '@deepseek-ai/dsh-http-proxy'
 import { DSH_LAUNCH_ENVIRONMENT_KEY, type LaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
 import { provideCmdline, type AppReady } from '@deepseek-ai/dsh-cmdline'
+import { recordExit } from './exit-log.ts'
 import { createProcessShutdown, type ProcessShutdown } from './process-shutdown.ts'
 
 const NAME = 'dsh'
@@ -304,11 +305,15 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
     // SIGTERM is a supervisor's ordinary stop request and exits 0 on every
     // surface — the launcher does not know whether the app considered its work
     // complete; SIGINT is a user interrupt and reports 130.
-    process.on('SIGTERM', () => { interrupt(0) })
-    process.on('SIGINT', () => { interrupt(130) })
+    // Both, and every fail-loud exit below, leave one line in the exit log: a
+    // detached server has no terminal, and the next boot can then say why the
+    // previous one stopped instead of only that an open turn was lost.
+    const home = resolveDshHome()
+    process.on('SIGTERM', () => { recordExit(home, 'shutdown', 'SIGTERM'); interrupt(0) })
+    process.on('SIGINT', () => { recordExit(home, 'shutdown', 'SIGINT'); interrupt(130) })
     installFailLoud(NAME, process, async () => {
       await app.current?.fiber.dispose()
-    })
+    }, (failure) => { recordExit(home, 'fatal', failure.label, failure.error) })
 
     const rootConfig = join(composed.profile.dir, PROFILE_ROOT_FILENAME)
     const profileContext: ProfileContext = {
@@ -317,7 +322,7 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       dir: composed.profile.dir, patchPath: composed.profile.patchPath,
       installAnchor: options.resolvedProfile?.installAnchor ?? INSTALL_ANCHOR,
       startedBundles: composed.profile.layers.map(layer => layer.packageName),
-      cwd: process.cwd(), home: resolveDshHome(),
+      cwd: process.cwd(), home,
       overlays: composed.overlays, telemetryDisabledEnv: process.env.DSH_TELEMETRY_DISABLED,
     }
     const ctx = await boot(NAME, rootConfig, readProfilePatches(NAME, profileContext, composed.profile), async (hostCtx) => {

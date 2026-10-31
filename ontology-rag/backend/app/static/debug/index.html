@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OntoRAG · 调试面板</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='white'%3E%E2%97%88%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/debug/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-left">
+    <span class="logo-mark">◈</span>
+    <div>
+      <h1>OntoRAG 调试面板</h1>
+      <p class="sub">本体制导三级检索 · SHACL 输出闸门 · 全链路可溯源</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div id="onto-chips" class="chips"></div>
+    <button id="settings-toggle" class="btn ghost sm" type="button">连接</button>
+  </div>
+</header>
+
+<section id="settings" class="settings hidden">
+  <label class="field">
+    <span>租户</span>
+    <input id="in-tenant" value="demo" autocomplete="off" spellcheck="false">
+  </label>
+  <label class="field">
+    <span>API Key</span>
+    <input id="in-key" type="password" placeholder="X-API-Key" autocomplete="off">
+  </label>
+  <label class="field">
+    <span>Top-K</span>
+    <input id="in-topk" type="number" min="1" max="20" value="5">
+  </label>
+  <label class="field">
+    <span>领域</span>
+    <select id="in-domain">
+      <option value="">自动</option>
+      <option value="contract">contract</option>
+      <option value="carbon">carbon</option>
+    </select>
+  </label>
+  <label class="check">
+    <input id="in-baseline" type="checkbox" checked>
+    <span>对比普通 RAG（纯向量）</span>
+  </label>
+  <p class="hint">凭据只存在本机 localStorage，不落服务端日志。</p>
+</section>
+
+<form id="ask-form" class="ask card">
+  <textarea id="in-question" rows="2" placeholder="输入业务问题，例如：C-2024-001 这笔 700 万的付款申请是否超付？" spellcheck="false"></textarea>
+  <div class="ask-actions">
+    <div id="examples" class="chips examples"></div>
+    <button id="run" class="btn primary" type="submit">运行链路 <kbd>⌘↵</kbd></button>
+  </div>
+</form>
+
+<div id="banner" class="banner hidden"></div>
+
+<div class="layout">
+  <main class="col-main">
+    <section class="card" id="card-intent">
+      <div class="card-head">
+        <h2><span class="step-no">1</span>本体解析</h2>
+        <span class="hint" id="intent-meta"></span>
+      </div>
+      <div class="card-body" id="intent-body"><p class="placeholder">运行后显示解析结果。</p></div>
+    </section>
+
+    <section class="card" id="card-tiers">
+      <div class="card-head">
+        <h2><span class="step-no">2</span>三级召回</h2>
+        <span class="hint">图谱 → 关键词 → 向量；向量仅在不足时触发</span>
+      </div>
+      <div class="card-body" id="tiers-body"><p class="placeholder">运行后显示分通道明细。</p></div>
+    </section>
+
+    <section class="card" id="card-guard">
+      <div class="card-head">
+        <h2><span class="step-no">3</span>SHACL 输出闸门</h2>
+        <span class="hint" id="guard-meta"></span>
+      </div>
+      <div class="card-body" id="guard-body"><p class="placeholder">运行后显示校验报告。</p></div>
+    </section>
+
+    <section class="card" id="card-answer">
+      <div class="card-head">
+        <h2><span class="step-no">4</span>最终答案与溯源</h2>
+        <span class="hint" id="answer-meta"></span>
+      </div>
+      <div class="card-body" id="answer-body"><p class="placeholder">运行后显示答案与链路。</p></div>
+    </section>
+  </main>
+
+  <aside class="col-side">
+    <section class="card">
+      <div class="card-head"><h2>对比普通 RAG</h2></div>
+      <div class="card-body" id="baseline-body"><p class="placeholder">运行后显示对照。</p></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>阶段耗时</h2><span class="hint" id="stage-total"></span></div>
+      <div class="card-body" id="stages-body"><p class="placeholder">—</p></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>检索统计</h2></div>
+      <div class="card-body" id="stats-body"><p class="placeholder">—</p></div>
+    </section>
+  </aside>
+</div>
+
+<footer class="foot">
+  <span>SPARQL 事实链优先 · 本体兼容性过滤 · SHACL 不通过即阻断</span>
+  <span id="trace-foot"></span>
+</footer>
+
+<script src="/debug/app.js"></script>
+</body>
+</html>

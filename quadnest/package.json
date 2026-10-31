@@ -1,0 +1,42 @@
+{
+  "name": "dsh-quadnest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "QuadNest: a private single-visitor micro-metaverse with four companion robots, opened from the left sidebar.",
+  "icon": "./icon.svg",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "host/emotion.js",
+    "host/proactive.js",
+    "host/world.js",
+    "host/prompts.js",
+    "host/protocol.js",
+    "host/pool.js",
+    "host/routes.js",
+    "host/memory.js",
+    "scripts/check-imports.mjs"
+  ],
+  "scripts": {
+    "test": "node tests/run.mjs && node tests/client.mjs",
+    "check:imports": "node scripts/check-imports.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  }
+}

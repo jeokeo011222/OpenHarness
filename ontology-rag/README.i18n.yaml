@@ -1,0 +1,97 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write ontology-rag/README.md
+/ontology-guided-rag-on-deepseek-harness:
+  en: dbc2223767b28b6e
+  zh: 1d6a9ca6a3aee87f
+/ontology-guided-rag-on-deepseek-harness/summary:
+  en: 7233d3e9bb2b8e74
+  zh: e833341e0900bdb0
+/ontology-guided-rag-on-deepseek-harness/table-of-contents:
+  en: e46f1ef6004d172f
+  zh: a6040e3545ee77e4
+/ontology-guided-rag-on-deepseek-harness/design:
+  en: 37a2fe5182e11d8f
+  zh: 5eeb5c270d28f1b7
+/ontology-guided-rag-on-deepseek-harness/design/three-tier-retrieval-with-fixed-weights:
+  en: 0d15b4be5530bc5a
+  zh: e3546ffa4b1e5fd5
+/ontology-guided-rag-on-deepseek-harness/design/scoring-and-why-each-factor-exists:
+  en: 98958d7abbd18abc
+  zh: c38b4130bf3f1c52
+/ontology-guided-rag-on-deepseek-harness/design/ontology-first-vector-last:
+  en: b9d166861208222a
+  zh: b4ad1e065bc39277
+/ontology-guided-rag-on-deepseek-harness/design/the-guard-is-not-optional:
+  en: fdf37dad23e189bf
+  zh: 79e4d7708dc47845
+/ontology-guided-rag-on-deepseek-harness/repository-layout:
+  en: bc066f0ea11e1c37
+  zh: c3d64c90cbd87186
+/ontology-guided-rag-on-deepseek-harness/deployment:
+  en: a147233b0bc665fa
+  zh: d84aabf3fab309c8
+/ontology-guided-rag-on-deepseek-harness/deployment/mode-a-memory-zero-dependencies:
+  en: 24a03ad6b2e35470
+  zh: 4c25effcb2ea4ba8
+/ontology-guided-rag-on-deepseek-harness/deployment/mode-b-full-stack:
+  en: 9f360211e4357254
+  zh: 0f6c34579819d210
+/ontology-guided-rag-on-deepseek-harness/deployment/required-environment:
+  en: 91a1f23b5b805582
+  zh: c1b66d140b679f79
+/ontology-guided-rag-on-deepseek-harness/deployment/health-checks:
+  en: 2f94f1bc668ce821
+  zh: f5605cd5e50f93b4
+/ontology-guided-rag-on-deepseek-harness/storage-and-migration:
+  en: 787bcba198069f15
+  zh: 741efbb0c9a812fa
+/ontology-guided-rag-on-deepseek-harness/request-lifecycle:
+  en: 37ce9d1ae05ce77e
+  zh: c5d06f051d265229
+/ontology-guided-rag-on-deepseek-harness/ontology-modeling-guide:
+  en: 62a62afd623bcd91
+  zh: 36e0913078ac00b2
+/ontology-guided-rag-on-deepseek-harness/ontology-modeling-guide/three-layers:
+  en: f6caa1b8aa7c7d46
+  zh: 225719e51a4f71a5
+/ontology-guided-rag-on-deepseek-harness/ontology-modeling-guide/two-shape-sets:
+  en: 10f3055b99a7238c
+  zh: b5e0a99d37819fb6
+/ontology-guided-rag-on-deepseek-harness/ontology-modeling-guide/add-a-domain:
+  en: 697527cf80065c14
+  zh: 9dbecc1f9fa11143
+/ontology-guided-rag-on-deepseek-harness/harness-integration:
+  en: 26ea62892f9d58e6
+  zh: d3f4eb229a275da8
+/ontology-guided-rag-on-deepseek-harness/harness-integration/tools:
+  en: 1c44a6f4e5062bef
+  zh: 5e40c1babc8e8cd3
+/ontology-guided-rag-on-deepseek-harness/harness-integration/lifecycle-hooks:
+  en: 5923c46c6fc5e16b
+  zh: c71677cdb3f2b09d
+/ontology-guided-rag-on-deepseek-harness/harness-integration/model-routing-and-cost-control:
+  en: e5a76aba79dc3053
+  zh: 6380a0b977c9306c
+/ontology-guided-rag-on-deepseek-harness/harness-integration/mount-it:
+  en: 835baf60219412c8
+  zh: e04072d76d3138f6
+/ontology-guided-rag-on-deepseek-harness/ingestion-and-chunking:
+  en: 7b8452f061d8bcaf
+  zh: cddbc1dedec4b394
+/ontology-guided-rag-on-deepseek-harness/poc-demo-flow:
+  en: 561b76bd233513c6
+  zh: 4bf5dc08343daed5
+/ontology-guided-rag-on-deepseek-harness/poc-demo-flow/visual-debug-panel:
+  en: b6ddfe746ea937e6
+  zh: 644a4844ff1d0bfd
+/ontology-guided-rag-on-deepseek-harness/accuracy-evaluation:
+  en: b82d3ff2f63577e5
+  zh: 5e822baaaa85b082
+/ontology-guided-rag-on-deepseek-harness/acceptance-criteria:
+  en: 429a3547b0b695a5
+  zh: c3b07cee2fcc9729
+/ontology-guided-rag-on-deepseek-harness/known-limitations:
+  en: 23728197e2c5da6d
+  zh: 858dcff69fd5ae22

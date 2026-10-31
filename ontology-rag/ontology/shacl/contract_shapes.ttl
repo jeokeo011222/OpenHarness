@@ -1,0 +1,132 @@
+@prefix con:  <http://ontorag.local/contract#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+
+## ---------------------------------------------------------------------------
+## 合同付款风控 SHACL 约束
+##
+## 这些 shape 是「输出前的强制闸门」：任何 LLM 结论都必须转成候选三元组，
+## 与租户实例数据合并后跑一遍本文件；不通过则整条回答被阻断。
+##
+## 注意：金额比较用 sh:sparql（SHACL Core 无法表达跨节点的算术比较），
+## 但仍然是声明式约束，不接受任何模型生成的代码。
+## ---------------------------------------------------------------------------
+
+con: a owl:Ontology ;
+    rdfs:label "合同付款风控 SHACL 约束集"@zh .
+
+## ------------------------- 1. 超付校验 -------------------------
+
+con:PaymentWithinRemaining
+    a sh:NodeShape ;
+    rdfs:label "付款申请不得超过合同剩余应付"@zh ;
+    sh:targetClass con:PaymentApplication ;
+    sh:sparql [
+        sh:message "超付风险：付款申请 {?this} 金额 {?amount}，合同 {?contract} 剩余应付仅 {?remaining}（合同额 {?total}，已付 {?paid}，质保金比例 {?retention}）" ;
+        sh:prefixes con: ;
+        sh:select """
+            SELECT $this ?amount ?contract ?remaining ?total ?paid ?retention
+            WHERE {
+                $this con:appliesToContract ?contract ;
+                      con:paymentAmount ?amount .
+                ?contract con:contractAmount ?total .
+                OPTIONAL { ?contract con:paidAmount ?paid0 }
+                OPTIONAL { ?contract con:retentionRate ?retention0 }
+                BIND(COALESCE(?paid0, 0) AS ?paid)
+                BIND(COALESCE(?retention0, 0) AS ?retention)
+                BIND(?total * (1 - ?retention) - ?paid AS ?remaining)
+                FILTER(?amount > ?remaining)
+            }
+            """ ;
+    ] .
+
+## ------------------- 2. 合同-发票-付款链路校验 -------------------
+
+con:InvoiceTotalWithinPayment
+    a sh:NodeShape ;
+    rdfs:label "发票合计不得超过付款申请金额"@zh ;
+    sh:targetClass con:PaymentApplication ;
+    sh:sparql [
+        sh:message "链路不一致：付款申请 {?this} 关联发票合计 {?invoiced} 超过申请金额 {?paid}" ;
+        sh:prefixes con: ;
+        sh:select """
+            SELECT $this ?invoiced ?paid
+            WHERE {
+                $this con:paymentAmount ?paid .
+                {
+                    SELECT $this (SUM(?invoiceAmount) AS ?invoiced)
+                    WHERE {
+                        $this con:hasInvoice ?invoice .
+                        ?invoice con:invoiceAmount ?invoiceAmount .
+                    }
+                    GROUP BY $this
+                }
+                FILTER(?invoiced > ?paid + 0.001)
+            }
+            """ ;
+    ] .
+
+## ------------------- 3. 付款必须挂在合同上 -------------------
+
+con:PaymentRequiresContract
+    a sh:NodeShape ;
+    rdfs:label "付款申请必须关联合同"@zh ;
+    sh:targetClass con:PaymentApplication ;
+    sh:property [
+        sh:path con:appliesToContract ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "付款申请 {?this} 未关联合同，或关联了多份合同" ;
+    ] ;
+    sh:property [
+        sh:path con:paymentAmount ;
+        sh:minCount 1 ;
+        sh:datatype xsd:decimal ;
+        sh:message "付款申请 {?this} 缺少金额，或金额不是数值类型" ;
+    ] .
+
+## ------------------- 4. 合同状态守卫 -------------------
+
+con:ClosedContractAcceptsNoPayment
+    a sh:NodeShape ;
+    rdfs:label "已关闭或已终止合同不得新增付款"@zh ;
+    sh:targetClass con:PaymentApplication ;
+    sh:sparql [
+        sh:message "状态冲突：付款申请 {?this} 指向的合同 {?contract} 状态为 {?status}，不可再付款" ;
+        sh:prefixes con: ;
+        sh:select """
+            SELECT $this ?contract ?status
+            WHERE {
+                $this con:appliesToContract ?contract .
+                ?contract con:contractStatus ?status .
+                FILTER(?status IN ("closed", "terminated"))
+            }
+            """ ;
+    ] .
+
+## ------------------- 5. 合同必备字段 -------------------
+
+con:ContractCoreFields
+    a sh:NodeShape ;
+    rdfs:label "合同必须具备金额、状态与签约方"@zh ;
+    sh:targetClass con:Contract ;
+    sh:property [
+        sh:path con:contractAmount ;
+        sh:minCount 1 ;
+        sh:datatype xsd:decimal ;
+        sh:message "合同 {?this} 缺少合同金额" ;
+    ] ;
+    sh:property [
+        sh:path con:contractStatus ;
+        sh:minCount 1 ;
+        sh:in ( "active" "closed" "terminated" ) ;
+        sh:message "合同 {?this} 状态缺失或不在允许取值内" ;
+    ] ;
+    sh:property [
+        sh:path con:signedWith ;
+        sh:minCount 1 ;
+        sh:message "合同 {?this} 未登记签约供应商" ;
+    ] .

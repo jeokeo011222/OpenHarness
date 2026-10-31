@@ -9,6 +9,8 @@
 
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { planMentions } from './mention.ts'
+import type { MentionCandidate, MentionPick } from './mention.ts'
 import { readDomainMeta, readSummaryCache, readVersionTurtle, writeSummaryCache } from './store.ts'
 import { generateSummary } from './summary.ts'
 
@@ -20,6 +22,19 @@ export const DEFAULT_STORE_PATH = resolve(__dirname, '..', '..', '..', 'ontology
 /** Default cap on injected summary characters across all configured domains. */
 export const DEFAULT_MAX_SUMMARY_CHARS = 4000
 
+/**
+ * How a turn's ontology context is chosen.
+ *
+ * `mention` (the default) reads the `@` tokens of the turn's own user message,
+ * so a plain chat carries no ontology at all. `always` keeps the pre-existing
+ * behaviour of injecting `defaultDomains` into every turn; deployments that
+ * pinned a domain globally before this option existed keep working.
+ */
+export type InjectionMode = 'mention' | 'always'
+
+/** Mode used when the deployment says nothing. */
+export const DEFAULT_INJECTION_MODE: InjectionMode = 'mention'
+
 /** Configurable options for the injector. */
 export interface InjectorConfig {
   /** Root directory holding the graph database and per-domain source documents. */
@@ -28,6 +43,8 @@ export interface InjectorConfig {
   defaultDomains?: readonly string[]
   /** Character budget for one summary; the per-turn injection carries only a one-line index. */
   maxSummaryChars?: number
+  /** Per-turn selection source: `@` mentions in the user message, or a fixed global list. */
+  injectionMode?: InjectionMode
 }
 
 /** Resolved injector state. */
@@ -35,6 +52,7 @@ interface ResolvedInjector {
   storePath: string
   defaultDomains: readonly string[]
   maxSummaryChars: number
+  injectionMode: InjectionMode
 }
 
 /**
@@ -50,7 +68,38 @@ export function resolveInjectorConfig(cfg: InjectorConfig): ResolvedInjector {
     storePath: cfg.storePath ? resolve(cfg.storePath) : DEFAULT_STORE_PATH,
     defaultDomains: [...new Set(domains)],
     maxSummaryChars: cfg.maxSummaryChars ?? DEFAULT_MAX_SUMMARY_CHARS,
+    // An unknown value falls back to `mention`: the narrower behaviour, never
+    // surprising a plain chat with ontology vocabulary it did not ask for.
+    injectionMode: cfg.injectionMode === 'always' ? 'always' : DEFAULT_INJECTION_MODE,
   }
+}
+
+/** Inputs for one turn's domain selection. */
+export interface SelectionInput {
+  /** Selection source: the message's tokens, or the configured list. */
+  readonly mode: InjectionMode
+  /** Domains configured for `always`; ignored otherwise. */
+  readonly defaults: readonly string[]
+  /** The turn's newest user message text. */
+  readonly text: string
+  /** Every registered domain, read only in `mention` mode. */
+  readonly domains: readonly MentionCandidate[]
+}
+
+/**
+ * Decide which domains this turn carries.
+ *
+ * `mention` returns nothing when no message token names a domain — deliberately
+ * without falling back to the configured list, because a fallback would make
+ * "the user did not select an ontology" indistinguishable from "the deployment
+ * pinned one", and the plain-chat promise would quietly break.
+ *
+ * @param input - mode, configured defaults, message text, and registered domains.
+ * @returns the picks to inject, in message order.
+ */
+export function selectTurnDomains(input: SelectionInput): MentionPick[] {
+  if (input.mode === 'always') return input.defaults.map(domain => ({ domain, token: '' }))
+  return planMentions(input.text, input.domains)
 }
 
 /**
@@ -114,14 +163,19 @@ export async function fetchDomainSummary(
  * Wrap the summary in a `<system-reminder>` block identical to the format
  * described in the design document. This textual envelope is what the model
  * actually consumes — not raw RDF triples.
+ *
  * @param summary - the rendered domain summary.
  * @param domain - the business domain id shown in the heading.
+ * @param note - optional sentence placed above the summary, used to tell the
+ *   model that a `@` token in the user message names this domain rather than a
+ *   path. Omitted for globally configured injection, which has no token.
  * @returns the reminder block appended to the step request.
  */
-export function wrapInjection(summary: string, domain: string): string {
+export function wrapInjection(summary: string, domain: string, note?: string): string {
+  const trimmedNote = note?.trim() ?? ''
   return `<system-reminder>
 ## 业务域本体知识：${domain}
-
+${trimmedNote.length === 0 ? '' : `\n${trimmedNote}\n`}
 ${summary.trim()}
 </system-reminder>`
 }

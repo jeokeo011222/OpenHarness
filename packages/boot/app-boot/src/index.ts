@@ -877,12 +877,16 @@ export const FAIL_LOUD_RELEASE_TIMEOUT_MS = 2_000
  * @param release - optional teardown awaited before exit, used by a
  *   terminal-owning surface to restore the terminal. Its own failure is
  *   swallowed because the pending fatal exit already owns the outcome.
+ * @param record - optional sink called once with the reported failure, for a
+ *   surface whose stderr nobody reads (a detached server). It runs before the
+ *   terminal write and its own failure is swallowed.
  * @returns the uninstaller that removes both handlers.
  */
 export function installFailLoud(
   binName: string,
   proc: FailLoudProcess = process,
   release?: () => Promise<void> | void,
+  record?: (failure: { readonly label: string; readonly error: unknown }) => void,
 ): () => void {
   let exiting = false
   const report = (err: unknown, label: string): void => {
@@ -891,6 +895,14 @@ export function installFailLoud(
     // real one or letting Node kill the process before the terminal is back.
     if (exiting) return
     exiting = true
+    // A recorder that throws must not cancel the exit it documents, and it runs
+    // before stderr so a detached surface keeps the reason even when nothing
+    // reads its stderr.
+    try {
+      record?.({ label, error: err })
+    } catch {
+      // The fatal exit below is the outcome that matters.
+    }
     proc.stderr.write(`${binName}: ${label}: ${inspect(err, { depth: 4, maxArrayLength: 50 })}\n`)
     if (release === undefined) {
       proc.exit(1)

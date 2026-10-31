@@ -1,0 +1,5 @@
+# ERP workbench: one host row that registers the call tool and the HTTP face,
+# and one client row that owns the workbench page and its sidebar entry.
+- insert:
+    - id: erp-workbench
+      name: dsh-erp-workbench

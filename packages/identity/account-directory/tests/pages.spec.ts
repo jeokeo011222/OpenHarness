@@ -40,7 +40,7 @@ describe('login page', () => {
 })
 
 describe('administration page', () => {
-  it('lists accounts, grants, and every grantable role', () => {
+  it('renders three tabs, accounts, grants, and role checkboxes', () => {
     const grant: GrantRecord = {
       userId: brandString<UserId>('account-2'),
       resourceKind: 'ontology-domain',
@@ -50,13 +50,25 @@ describe('administration page', () => {
     }
     const viewer = { ...admin, id: brandString<UserId>('account-3'), username: 'bob', roles: [] }
     const html = adminPage(admin, [admin, viewer], [grant], '未授权')
+    // Three-tab shell
+    expect(html).toContain('data-pane="users"')
+    expect(html).toContain('data-pane="roles"')
+    expect(html).toContain('data-pane="permissions"')
+    // Account list
     expect(html).toContain('alice')
     expect(html).toContain('bob')
     expect(html).toContain('ontology-domain')
+    // Per-user action buttons
+    expect(html).toContain('data-action="permissions"')
+    expect(html).toContain('data-action="edit"')
+    expect(html).toContain('data-action="delete"')
+    // Notice and grant roles
     expect(html).toContain('未授权')
     expect(html).toContain('name="roles" value="publisher"')
-    expect(html).toContain('value="1" checked')
-    expect(html).toContain('value="1">')
+    expect(html).toContain('name="roles" value="reviewer"')
+    // Role table includes admin badge and resource role badges
+    expect(html).toContain('role-badge admin')
+    expect(html).toContain('<span class="role-badge">owner</span>')
   })
 
   it('renders the empty grant list and escapes stored text', () => {
@@ -64,5 +76,7 @@ describe('administration page', () => {
     const html = adminPage(evil, [evil], [], undefined)
     expect(html).toContain('暂无授权')
     expect(html).toContain('&lt;evil&gt;')
+    // Role table still renders global/admin row
+    expect(html).toContain('>全局<')
   })
 })

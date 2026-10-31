@@ -1,0 +1,89 @@
+/* The seated dropdown shared by both ontology pickers: the composer's chat
+   seat and the ontology center's scope seat. Geometry and type follow the
+   host's own seated choices (the workspace picker and the agent preset), so a
+   plugin control reads as one of them rather than as a lookalike. Theme aliases
+   only, so light and dark follow the host without a second stylesheet. */
+
+/* The Menu's anchor wrapper between the host row and the seat: a flex child's
+   auto minimum would hold the full label width and the row could never
+   compress the seat. The explicit floor is the icon-only end state — 8px
+   paddings + 16px icon + two 4px gaps + 14px chevron. */
+.anchor {
+  display: inline-flex;
+  min-width: 54px;
+  max-width: min(100%, 260px);
+}
+
+.seat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-radius: var(--dsw-radius-sm);
+}
+
+.seat[aria-expanded='true'] {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+@media (hover: hover) {
+  .seat:not(:disabled):hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.seat:disabled {
+  color: var(--dsw-alias-label-quaternary);
+  cursor: default;
+}
+
+.seatIcon {
+  display: inline-flex;
+  flex: none;
+  color: var(--dsw-alias-label-primary);
+}
+
+.seatLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  flex: none;
+  color: var(--dsw-alias-label-caption);
+}
+
+/* Menu rows carry the name over its identity: the label alone never says which
+   domain the pick means, and two domains can share a label. */
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 280px;
+}
+
+.itemName {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.itemDesc {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-caption);
+  white-space: normal;
+}

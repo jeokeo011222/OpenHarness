@@ -6,7 +6,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentOptions, AgentSetup } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
-import type {} from '@deepseek-ai/dsh-agent-preset-registry'
+import type { AgentPresetRegistry } from '@deepseek-ai/dsh-agent-preset-registry'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-session-query'
@@ -266,20 +266,50 @@ export class ApiSessionAgentController {
   /**
    * Resolve the preset id and pre-publication Agent setup for a create or resume.
    * @param presetId - requested preset or the configured default when omitted.
+   * @param recorded - the id is the preset a stored Session already ran rather
+   *   than one a caller asked for. A deployment that no longer declares it runs
+   *   the default instead: refusing would make the conversation unopenable, the
+   *   dead end a stored blank draft already avoids by resuming under the default.
    * @returns the resolved preset identity and Agent setup callback.
    */
-  async composeAgent(presetId: string | undefined): Promise<ApiSessionComposition> {
+  async composeAgent(presetId: string | undefined, recorded = false): Promise<ApiSessionComposition> {
     const presets = this.ctx.get('agentPresets')
     if (presets === undefined) {
       return { setup: (agentCtx) => { installModelSelection(agentCtx) } }
     }
-    const resolvedId = (await presets.resolve(presetId)).id
+    const resolvedId = await this.resolvePreset(presets, presetId, recorded)
     return {
       agentPreset: resolvedId,
       setup: async (agentCtx) => {
         installModelSelection(agentCtx)
         await presets.mount(agentCtx, resolvedId)
       },
+    }
+  }
+
+  /**
+   * Resolve a preset id, tolerating one a stored Session recorded but this
+   * deployment no longer declares.
+   * @param presets - composed preset roster.
+   * @param presetId - requested or recorded preset id; the default when omitted.
+   * @param recorded - whether a missing id is the preset a Session already ran,
+   *   which falls back to the default instead of refusing the resume.
+   * @returns the resolved preset identity.
+   */
+  private async resolvePreset(
+    presets: AgentPresetRegistry,
+    presetId: string | undefined,
+    recorded: boolean,
+  ): Promise<string> {
+    try {
+      return (await presets.resolve(presetId)).id
+    } catch (error: unknown) {
+      if (!recorded || remoteErrorOf(error)?.code !== 'agent-preset/not-found') throw error
+      const fallback = (await presets.resolve(undefined)).id
+      this.ctx.logger.warn(
+        `api-session: recorded agent preset "${String(presetId)}" is not declared here; resuming under "${fallback}"`,
+      )
+      return fallback
     }
   }
 
@@ -315,7 +345,7 @@ export class ApiSessionAgentController {
     if (hasApiSessionSubagentOwner(this.ctx, { header: observation.header }, undefined)) {
       throw new ApiSessionSubagentOwnership(sessionId)
     }
-    const composition = await this.composeAgent(this.presetForObservation(observation))
+    const composition = await this.composeAgent(this.presetForObservation(observation), true)
     const published = this.ctx.sessions.get(sessionId)
     const live = this.ctx.agents.get(sessionId)
     if (published !== undefined && hasApiSessionSubagentOwner(this.ctx, published, live)) {

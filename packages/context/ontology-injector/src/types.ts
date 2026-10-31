@@ -63,6 +63,44 @@ export type {
   MetricUnit,
 } from './analytics-types.ts'
 
+/** Severity a SHACL constraint reports. */
+export type ComplianceSeverity = 'Violation' | 'Warning' | 'Info'
+
+/** One shape's violation tally in a compliance report. */
+export interface ComplianceRule {
+  /** Shape IRI. */
+  readonly shape: string
+  /** Shape label shown in the report. */
+  readonly label: string
+  /** Local name of the class the shape targets. */
+  readonly targetClass: string
+  /** Shape severity. */
+  readonly severity: ComplianceSeverity
+  /** Violating focus nodes counted, capped at the gate's per-shape limit. */
+  readonly violations: number
+  /** Sample violating nodes, for follow-up queries. */
+  readonly focusNodes: readonly string[]
+  /** Distinct rendered messages the violations produced. */
+  readonly messages: readonly string[]
+}
+
+/** Full compliance verdict for one domain. */
+export interface ComplianceReport {
+  readonly domain: string
+  /** No `Violation`-severity finding and no shape failed to run. */
+  readonly conforms: boolean
+  /** Instance batches the report covered, ordered by id. */
+  readonly batches: readonly string[]
+  /** Shapes loaded, including shapes that produced no violation. */
+  readonly shapes: number
+  /** Constraints executed. */
+  readonly checked: number
+  /** Per-shape tallies, ordered by violation count then shape IRI. */
+  readonly rules: readonly ComplianceRule[]
+  /** Shapes that could not run, e.g. a SPARQL constraint error. */
+  readonly errors: readonly string[]
+}
+
 /** One instance batch a domain's analytics can read. */
 export interface InstanceBatch {
   /** Batch id, unique within the domain. */
@@ -252,6 +290,11 @@ export const AUDIT_ACTIONS = [
   'metric-run',
   'instance-import',
   'instance-clear',
+  'object-sync',
+  'action-propose',
+  'action-commit',
+  'compliance-run',
+  'shapes-import',
 ] as const
 
 /** Kinds of change recorded in the ontology audit log. */
@@ -315,3 +358,33 @@ export interface OntologyHealth {
   readonly formatVersion: number
   readonly domains: readonly DomainStats[]
 }
+
+/**
+ * Retrieval and gate types.
+ *
+ * Re-exported here so the Client bundle can import one module for every wire
+ * shape: the panel never reaches into `src/retrieval/` directly, and the Host
+ * keeps the retrieval internals free to change.
+ */
+export type {
+  AnswerClaim,
+  BaselineSide,
+  ChainStep,
+  ChunkLibraryStats,
+  DocType,
+  DroppedChunk,
+  EvidenceChunk,
+  GateReport,
+  GateViolation,
+  GraphFact,
+  IngestRequest,
+  RankedChunk,
+  RecallTier,
+  RetrievalOutcome,
+  SparqlTrace,
+  StageTiming,
+  StructuredQuery,
+  TierReport,
+  TraceExample,
+  TraceResult,
+} from './retrieval/types.ts'

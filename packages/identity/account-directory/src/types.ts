@@ -48,6 +48,55 @@ export interface AccountAclRule {
   bind(resourceId: string, roles: readonly AccountRole[]): readonly RemoteAccessBinding[]
 }
 
+/**
+ * One resource a grant may name, contributed by the business package that owns
+ * the kind. The workbench renders these as a dictionary instead of asking the
+ * administrator to type an id from memory.
+ */
+export interface AccountResourceEntry {
+  /** Resource id stored on the grant. */
+  readonly id: string
+  /** Human label for the id; defaults to the id itself. */
+  readonly label?: string
+}
+
+/**
+ * One business package's resource dictionary: the ids of the kind it owns.
+ *
+ * A kind with no source still appears in the dictionary as soon as a grant
+ * names it, so an existing grant never becomes un-editable.
+ */
+export interface AccountResourceSource {
+  /** Resource kind, e.g. `ontology-domain`. */
+  readonly kind: string
+  /** Human label for the kind; defaults to the kind itself. */
+  readonly label?: string
+  /**
+   * List the ids of this kind that exist right now.
+   * @returns the entries the administrator may grant.
+   */
+  list(): Promise<readonly AccountResourceEntry[]>
+}
+
+/** Registry of per-kind resource dictionaries. */
+export interface AccountResourceCatalog {
+  /**
+   * Contribute the dictionary of one resource kind.
+   * @param source - Kind, label, and the id list it can enumerate.
+   * @returns a disposer removing the contribution.
+   */
+  register(source: AccountResourceSource): () => void
+}
+
+/**
+ * The dictionary an administration surface renders: every kind that can be
+ * granted, and the ids behind each of them.
+ */
+export interface AccountResourceDictionary {
+  readonly kinds: readonly { readonly kind: string; readonly label: string; readonly count: number }[]
+  readonly resources: Readonly<Record<string, readonly AccountResourceEntry[]>>
+}
+
 /** Registry of per-kind grant rules and baseline bindings. */
 export interface AccountAcl {
   /**

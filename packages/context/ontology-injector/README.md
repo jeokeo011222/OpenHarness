@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-ontology-injector` stores business ontologies in an embedded RDF graph database and injects a one-line index per approved domain each turn; the `domain_summary` tool returns the full vocabulary on demand. The ontology center workbench creates, generates, edits, versions, publishes, validates, and queries domains, and its analytics tab runs six contract metrics over imported instance batches with per-contract deduplication, caveats, drilldown, and audit. Only published versions reach the model. One root holds the image, snapshots, instance batches, and sources; summaries cap at 4000 characters.
+`dsh-ontology-injector` stores business ontologies in an embedded RDF graph database and injects a one-line index per approved domain each turn; the `domain_summary` tool returns the full vocabulary on demand. The workbench generates, edits, versions, publishes, validates, and queries domains; its analytics tab runs six contract metrics over instance batches; its compliance report counts SHACL violations per rule — contracts missing a party identifier, for example. The retrieval tab recalls evidence in three tiers, filters by ontology compatibility, gates on SHACL, and shows the evidence chain. Only published versions reach the model; one root holds everything; summaries cap at 4000 characters.
 
 ## Table of Contents
 
@@ -25,15 +25,19 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
-Mount this plugin when the model should know the organization's business vocabulary before it answers questions about policies, orders, or other named business domains. Injection runs once per turn: a `agent/pre-step` waterfall listener delegates first, skips rejected or aborted steps, and adds one user-role message at step 1. Domains in `defaultDomains` are injected in order, but a domain with no published version is skipped, and a domain marked `disabled` is skipped in `updateDomain`. A session never receives two injections for the same turn.
+Mount this plugin when the model should know the organization's business vocabulary before it answers questions about policies, orders, or other named business domains. Injection runs once per turn: an `agent/pre-step` waterfall listener delegates first, skips rejected or aborted steps, and adds one user-role message at step 1. With the default `injectionMode: mention`, only a domain the user picked above the composer — and which therefore appears as `@<domain>` in the message — is injected; a message without that token injects nothing, stays a plain chat, and never falls back to `defaultDomains`. `injectionMode: always` injects `defaultDomains` in order instead. A domain with no published version, or one marked `disabled`, is skipped, and a session never receives two injections for the same turn.
 
 ### What the model gets
 
 Each injected block starts with `## 业务域本体知识：<domain>` and carries a one-line index: the domain label and id, how many classes, object relations, and data properties it holds, and the `domain_summary` call that returns the full vocabulary. When the model calls that tool, it reads the published version graph and renders the Markdown summary: a `### 对象类` list of class labels with local names, a `### 关键关系` list of object properties as `Domain → label → Range`, and a `### 数据属性` list of datatype properties with their range local names. Blocks are wrapped in `<system-reminder>` and joined into one user-role message with the source kind `ontology-injector`, so the index stays in durable history. Tool text longer than the budget is cut on a line boundary and ends with a truncation suffix.
 
+### Choosing a domain in the chat
+
+On the new-session screen it shares a line with "default workspace" and "standard mode" (once the conversation starts it moves above the input card). That one dropdown lists every domain, dims the disabled ones with their reason, and rests on "no ontology". Picking one inserts `@<domain>` into the draft, picking "no ontology" removes it, and picking another swaps it in place; the current state is derived from the draft text, so deleting the token by hand also returns to "no ontology". The Host claims only a `@` token that matches the label or id of a registered, enabled domain; every other token — `@README.md`, for instance — stays a file path for the file-reference prompt. On a hit, the injected block opens with a sentence saying the token names this domain rather than a path. Domain labels must therefore be unique, and a rename that would collide is refused.
+
 ### Configuration
 
-The minimal mount needs no configuration, but it injects nothing until a domain exists in the store and appears in `defaultDomains`. The extraction model needs `apiKey` or `DEEPSEEK_API_KEY`; every other field has a default.
+The minimal mount needs no configuration: in the default mode, picking a domain in the chat is enough, and `defaultDomains` only matters for `injectionMode: always`. The extraction model needs `apiKey` or `DEEPSEEK_API_KEY`; every other field has a default.
 
 ```yaml
 - name: '@deepseek-ai/dsh-ontology-injector'
@@ -45,7 +49,8 @@ The minimal mount needs no configuration, but it injects nothing until a domain 
 | Field | Default | Meaning |
 |---|---|---|
 | `storePath` | repo `ontology-store/` | Root directory holding the graph image and per-domain sources |
-| `defaultDomains` | `[]` | Domain ids injected at step 1, trimmed and deduplicated in order |
+| `defaultDomains` | `[]` | Domain ids injected at step 1, trimmed and deduplicated in order (used by `always` only) |
+| `injectionMode` | `mention` | `mention` injects only the domain a message selects with `@`; `always` injects `defaultDomains` every turn |
 | `maxSummaryChars` | `4000` | Maximum characters kept from the summary the `domain_summary` tool returns |
 | `model` | `deepseek-chat` | Extraction model called from an OpenAI-compatible endpoint |
 | `baseUrl` | `https://api.deepseek.com/v1` | Chat-completions endpoint for extraction |
@@ -65,12 +70,13 @@ One Oxigraph dataset backs the root. It is loaded on first use and rewritten ato
 - `urn:dsh:ontology:audit` — the append-only audit trail.
 - `urn:dsh:ontology:graph:<domain>` and `urn:dsh:ontology:graph:<domain>:<version>` — the live graph and one immutable snapshot per version.
 - `urn:dsh:ontology:graph:inst:<domain>:<batch>` — one named graph per imported instance batch, so replacing or clearing a batch never touches the ontology or its snapshots.
+- `urn:dsh:ontology:graph:shapes:<domain>` — one named graph per domain holding the SHACL shapes. Shapes live apart from the live graph because a workbench edit rewrites the live graph through the model, which cannot represent SHACL blank-node structures.
 - `<domain>/sources/` — uploaded documents, stored with a timestamp prefix and sanitized file name; domain deletion leaves them in place.
 - `backups/` — images written by `OntologyDatabase.backup()`.
 
 ### The workbench
 
-The Web client face has four tabs: the domain list, the graph workbench, the analytics tab, and the audit trail. The graph workbench renders the graph canvas, the node inspector, and the versions panel, and confirms destructive actions before they run. It talks to the Host service through `ctx.remote.ontologyStore`, whose methods are `listDomains`, `createDomain`, `updateDomain`, `deleteDomain`, `generate`, `getGraph`, `applyEdits`, `applyPatch`, `listVersions`, `submitReview`, `publishVersion`, `deleteVersion`, `diffVersions`, `exportDomain`, `importOntology`, `validateDomain`, `evaluateQuality`, `queryDomain`, `listMetrics`, `runMetric`, `explainMetric`, `drilldownMetric`, `listMetricBatches`, `importInstances`, `deleteInstanceBatch`, `auditLog`, and `health`.
+The Web client face has five tabs: the domain list, the graph workbench, the analytics tab, the retrieval verification tab, and the audit trail. The scope dropdown at the right of the header carries the current domain into every tab — after a switch each tab shows that one domain, without a trip back to the list tab to re-pick. The graph workbench renders the graph canvas, the node inspector, and the versions panel, and confirms destructive actions before they run. It talks to the Host service through `ctx.remote.ontologyStore`, whose methods are `listDomains`, `createDomain`, `updateDomain`, `deleteDomain`, `generate`, `getGraph`, `applyEdits`, `applyPatch`, `listVersions`, `submitReview`, `publishVersion`, `deleteVersion`, `diffVersions`, `exportDomain`, `importOntology`, `validateDomain`, `evaluateQuality`, `queryDomain`, `listMetrics`, `runMetric`, `explainMetric`, `drilldownMetric`, `listMetricBatches`, `importInstances`, `deleteInstanceBatch`, `importShapes`, `exportShapes`, `complianceReport`, `auditLog`, and `health`.
 
 Generated, edited, patched, and imported graphs all become drafts. A draft changes the working graph the workbench renders but never the injected summary; `submitReview` moves it to `review`, and `publishVersion` copies that snapshot into the live graph and marks it active. Publishing an older published version is the rollback path, and a draft cannot be published before review. Each node also records the clause it came from and a clause-text excerpt, shown in the inspector as the source clause and text.
 
@@ -195,13 +201,14 @@ These limits define when the ontology center is a poor fit. They are current pac
 - **One writer per image** — concurrent processes serialize on `graph.db.lock`; a live holder surfaces as `ontology/busy`, and takeover follows a 60-second age threshold rather than an explicit unlock.
 - **Prose summaries only** — the injection carries labels, comments, and domain/range local names. Restrictions, cardinalities, and OWL inference never reach the model, and a missing label falls back to the local name.
 - **Silent skips** — a missing or disabled domain produces no block and no model-visible notice, so a misconfigured `defaultDomains` entry looks the same as an empty ontology.
+- **`@` tokens render as file references in the transcript** — a user message's `@<domain>` shares the `@` syntax with file references, so the transcript matches it with the file rule and clicking it opens a path that does not exist. This round guarantees Host resolution only; a dedicated appearance and user-text rule are deferred.
 - **Review is a workflow, not an identity check** — a draft cannot be published until it is submitted for review, but every caller shares one workbench identity; there is no per-user approval or domain ownership enforcement.
 - **Extraction limits** — generation needs an API key, accepts only DOCX, PDF, MD, and TXT, slices each clause to 6000 characters, processes at most `maxClauses` clause groups, and trusts the model's JSON for names and labels. Each node keeps at most `maxEvidenceChars` characters of clause text.
 - **Read-only queries** — `queryDomain` accepts SELECT and ASK and rejects INSERT, DELETE, CLEAR, DROP, and other update forms with `ontology/query-rejected`; rows are lexical strings without datatype or language tags.
 - **Analytics trusts the ontology's IRIs** — metrics match instance data by the IRIs the live ontology declares. An instance typed or populated with IRIs outside that vocabulary is invisible to those metrics, and a `class` or `property` filter cannot name it.
 - **Deduplication is IRI-only** — every metric collapses rows by instance IRI, so two genuinely distinct resources that share an IRI merge into one.
 - **No numeric aggregation** — the catalog counts instances and property values; it does not sum or average numeric properties, and currency totals are not computed.
-- **Instance imports are Turtle-only and unvalidated against the ontology** — `importInstances` parses the document and writes every triple it declares. There is no CSV or Excel reader, no SHACL or shape check, and a batch written against a different vocabulary simply produces empty metrics.
+- **Instance imports are Turtle-only and unvalidated against the ontology** — `importInstances` parses the document and writes every triple it declares, so a batch written against a different vocabulary simply produces empty metrics. There is no CSV or Excel reader and no import-time rejection; shape violations are found afterwards by `complianceReport`, which counts them per rule but does not block the write.
 - **No downgrade** — an image recorded at a newer format version is refused, and there is no migration path back.
 
 <a id="dev-note"></a>

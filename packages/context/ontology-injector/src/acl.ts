@@ -22,6 +22,9 @@ const READ_ACTIONS = [
   'ontologyStore/explainMetric',
   'ontologyStore/drilldownMetric',
   'ontologyStore/listMetricBatches',
+  'ontologyStore/retrievalTrace',
+  'ontologyStore/retrievalLibrary',
+  'ontologyStore/retrievalChunks',
 ] as const satisfies readonly RemoteAccessAction[]
 
 /** Endpoints that draft or change vocabulary within one domain. */
@@ -34,6 +37,7 @@ const AUTHOR_ACTIONS = [
   'ontologyStore/createDomain',
   'ontologyStore/evaluateQuality',
   'ontologyStore/importInstances',
+  'ontologyStore/retrievalIngest',
 ] as const satisfies readonly RemoteAccessAction[]
 
 /** Reviewers move a draft into review; publishers move a reviewed version live. */
@@ -66,6 +70,8 @@ const BASELINE_ACTIONS = [
   'ontologyStore/listDomains',
   'ontologyStore/health',
   'ontologyStore/auditLog',
+  // Static demonstration copy: no domain, no store read, nothing to protect.
+  'ontologyStore/retrievalExamples',
 ] as const satisfies readonly RemoteAccessAction[]
 
 /**

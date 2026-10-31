@@ -1,4 +1,5 @@
-/** Host plugin: register the analysis tools and the prompt section against the shared runtime. */
+/** Host plugin: register the analysis tools, the workbench API, and the prompt section. */
+import { registerApi } from './api.js'
 import { registerTools } from './tools.js'
 import { sectionText } from './prompt.js'
 
@@ -16,6 +17,9 @@ export function applyHost(ctx, config) {
     queryCache: new Map(),
   }
   ctx.effect(() => registerTools(ctx, runtime), 'data-analysis: tools')
+  // The browser workbench reaches the same runtime over HTTP. A profile with no
+  // web server (headless, CLI) simply leaves this seat empty.
+  ctx.effect(() => registerApi(ctx, runtime), 'data-analysis: workbench api')
   ctx.effect(() => ctx.systemPrompt.section({
     name: 'data-analysis',
     order: SECTION_ORDER,

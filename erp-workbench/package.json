@@ -1,0 +1,36 @@
+{
+  "name": "dsh-erp-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ERP workbench bundle: connect Yonyou U8 or Kingdee Cloud Galaxy, edit the action-to-API mapping, and try one call — the frontend entry the ERP connector never had.",
+  "icon": "./icon.svg",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "host/config-store.js",
+    "host/runtime.js",
+    "host/api.js",
+    "host/tools.js",
+    "host/util.js"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": [
+        "./cordis.patch.yml"
+      ]
+    },
+    "client": {
+      "platform": "web"
+    }
+  }
+}
