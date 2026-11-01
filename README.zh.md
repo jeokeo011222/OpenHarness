@@ -349,6 +349,17 @@ OpenHarness 当前处于持续开发与验证阶段。部分接口、插件和 E
 
 开始之前，请阅读仓库中的 `CONTRIBUTING.md`。
 
+## 🙏 致谢
+
+OpenHarness 的构建和运行站在多个优秀开源项目的肩膀上：
+
+- **[DeepSeek](https://www.deepseek.com/)** — 开源模型与 API，支撑 OpenHarness 日常开发与验证。
+- **[Cordis](https://github.com/cordiverse/cordis)** — 时空可组合运行时，Agent Harness 的插件架构底座。
+- **[Oxigraph](https://github.com/oxigraph/oxigraph)** — 嵌入式 RDF 图数据库，承载企业本体存储。
+- **[rdflib](https://github.com/linkeddata/rdflib.js)** — Turtle / OWL / RDF 解析，本体文件的加载与校验。
+
+感谢以上项目的维护者与贡献者，以及每一位参与构建开源 AI Agent 生态的开发者。
+
 ## 📄 License
 
 本项目采用 [Apache License 2.0](./LICENSE)。第三方依赖及其许可证信息请参阅 `THIRD_PARTY_NOTICES.md`。
