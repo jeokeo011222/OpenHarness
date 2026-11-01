@@ -64,7 +64,7 @@
     "bundle": "tsdown",
     "watch": "tsdown --watch"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "@deepseek-ai/dsh-account-directory": "workspace:*",
     "@deepseek-ai/dsh-api-remote-access": "workspace:*",

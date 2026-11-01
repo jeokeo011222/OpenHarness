@@ -42,7 +42,7 @@
   "scripts": {
     "postinstall": "node scripts/ensure-spawn-helper.mjs"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "@deepseek-ai/dsh-subprocess": "workspace:*",
     "@deepseek-ai/dsh-timeout": "workspace:*",

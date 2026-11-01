@@ -34,7 +34,7 @@
       "default": "./lib/typert.remote-client.js"
     }
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",

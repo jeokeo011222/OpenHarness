@@ -3,7 +3,7 @@
   "description": "Electron desktop shell for a bundled dsh runtime and external plugins",
   "version": "0.2.2-alpha.2",
   "private": true,
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": {
     "name": "Hangzhou DeepSeek Artificial Intelligence Co., Ltd."
   },

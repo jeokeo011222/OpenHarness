@@ -29,7 +29,7 @@
     "serve:preview": "http-server dist -a 0.0.0.0 -p 4173 -c-1",
     "render:app-icons": "tsx scripts/render-app-icons.ts"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "devDependencies": {
     "@deepseek-ai/cordis-plugin-group": "workspace:~",
     "@deepseek-ai/dsh-client-modules": "workspace:*",

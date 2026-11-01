@@ -660,7 +660,8 @@ window.__ModuleLoader__.load({
             actions.map(action => e('option', {
               key: action.domain + '::' + action.action,
               value: action.domain + '::' + action.action,
-            }, actionLabel(action)))))),`r`n        e('label', { className: 'erp-field' },
+            }, actionLabel(action)))))),
+        e('label', { className: 'erp-field' },
           e('span', null, t('invoke.params')),
           e('textarea', {
             className: 'erp-area',

@@ -26,7 +26,7 @@
       "default": "./lib/client.js"
     }
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "@deepseek-ai/dsh-util-crypto": "workspace:*",
     "@noble/hashes": "^2.4.0",

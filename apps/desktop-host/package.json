@@ -3,7 +3,7 @@
   "description": "Private Node-mode host process for the Electron desktop application",
   "version": "0.2.2-alpha.2",
   "private": true,
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "main": "lib/index.js",
   "files": [

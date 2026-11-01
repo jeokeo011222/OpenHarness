@@ -28,7 +28,7 @@
     "./references/*.md": "./references/*.md",
     "./skills/*.md": "./skills/*.md"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-llm": "workspace:*",
