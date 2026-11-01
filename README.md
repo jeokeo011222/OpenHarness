@@ -1,207 +1,366 @@
+<div align="center">
+
 # Ontology OpenHarness
 
 English | [中文](README.zh.md)
 
-<p align="center">
-  <img src="./apps/web/public/logo.png" alt="OpenHarness" width="180" />
-  <br />
-  <strong>Ontology OpenHarness</strong>
-</p>
+### 让 AI 真正理解企业，而不只是连接企业数据。
 
-<p align="center">
+**An Ontology-Driven Enterprise Agent Harness**
 
-[![Node.js](https://img.shields.io/badge/Node.js-≥24.9.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/) [![pnpm](https://img.shields.io/badge/pnpm-11.28+-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/) [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/jeokeo011222/Openharness/pulls) [![GitHub stars](https://img.shields.io/github/stars/jeokeo011222/Openharness?style=social)](https://github.com/jeokeo011222/Openharness/stargazers)
+以企业本体为语义底座，以 Agent Harness 为运行内核，以数据分析和 ERP 连接为业务执行入口。
 
-</p>
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A524.9-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![pnpm](https://img.shields.io/badge/pnpm-%E2%89%A511.28-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
+[![OWL/RDF](https://img.shields.io/badge/OWL%2FRDF-semantic-9C27B0?logo=rdf&logoColor=white)](https://www.w3.org/RDF/)
 
-<p align="center">
+[快速开始](#-快速开始) · [核心能力](#-核心能力) · [系统架构](#-系统架构) · [参与贡献](#-参与贡献)
 
-**An enterprise-grade, ontology-driven agent harness: your business knowledge becomes context the agent can act through, your spreadsheets and databases become one analysis workbench, and mainstream ERPs become callable — all under local accounts you fully control.**
-
-</p>
-
-<p align="center">
-  <img src="./docs/assets/readme/workbench.png" alt="The OpenHarness web workbench: sessions, plugins, and a chat that reaches every capability" width="49.5%" />
-  <img src="./docs/assets/readme/quadnest.png" alt="QuadNest: four companion robots sharing one private micro-metaverse" width="49.5%" />
-</p>
+</div>
 
 ---
 
-## ✨ Why OpenHarness
+## 🌐 OpenHarness 是什么？
 
-Every agent is context-limited. OpenHarness gives the agent a **business ontology it can act through** rather than only read: Turtle OWL/RDF parsed into class and property summaries for the prompt, object types bound to real rows so the model can query them, and declared actions it may only *propose* — a human approves before anything is written.
+企业并不缺少数据，也不缺少软件系统。真正困难的是：**让 AI 理解这些数据代表什么、业务对象之间有什么关系、业务规则如何约束操作，以及如何安全地把分析结果转化为业务行动。**
 
-Around that core sits a plugin-first runtime: clients, tools, storage, and model providers are effects registered on documented seams, so a new capability is a new plugin instead of a new branch in the agent loop.
+OpenHarness 是一个基于 DeepSeek Harness 扩展构建的、以插件为核心的企业级 Agent Harness。它将企业本体（Ontology）、数据分析能力和 ERP 连接能力整合到统一的智能体运行环境中，帮助 AI 从“理解自然语言”进一步走向“理解企业业务”。
 
-## 🏭 Enterprise ontology at the core
+OpenHarness 不只是一个聊天界面，也不只是一个 ERP API 包装层。它尝试建立一条完整的企业智能链路：
 
-<p align="center">
-  <img src="./docs/assets/readme/ontology.png" alt="The ontology center: published domains, knowledge graph, analysis, retrieval checks, and audit log" width="100%" />
-</p>
+**企业知识建模 → 业务语义注入 → 数据对象绑定 → 智能分析 → 动作提议 → 人工审批 → 业务系统执行**
 
-Business knowledge is compiled once and read on every turn: published ontologies are verified, stored as an RDF graph, and summarized into the prompt before the first model step.
+> **核心理念：让 AI 从“知道企业有什么数据”，进化到“理解企业如何运作”。**
 
-- **Sources are ordinary files** — each business domain keeps its Turtle OWL/RDF documents next to the project, and an upload publishes them into the graph store after structural validation.
-- **The store is the single truth** — `oxigraph` holds `graph.db.nq` plus uploaded sources, and the injected summary is rebuilt from the store on each request instead of being hand-edited.
-- **Writes need a human** — a proposal records the before/after of every field it would change, every blocking precondition, and the linked objects it touches. No tool can approve one.
+## ✨ 为什么是 Ontology-Driven？
 
-The pipeline below is how one request meets your ontology — parse, store, infer, inject, and only then call the ERP behind an approved action:
+传统 AI 应用通常通过提示词、文档检索或数据库 Schema，让模型间接了解企业。但这些方式很难稳定表达复杂业务中的对象类型、属性约束、对象关系和操作规则。
 
-<p align="center">
-  <img src="./docs/assets/readme/ontology-pipeline.svg" alt="Ontology pipeline: sources, graph store, inference, injected summary, ERP call" width="100%" />
-</p>
+OpenHarness 引入 OWL/RDF 企业本体，将业务知识组织为机器可解析的语义结构，并在 Agent 执行过程中提供上下文。
 
-Working scenarios ship with the repo as Turtle documents and object bindings — contracts, procurement, and payment-priority analysis are already modeled end to end, so a new business domain starts from a template instead of a blank page.
+| 传统方式 | OpenHarness 的本体驱动方式 |
+|---|---|
+| 让模型从表名、字段名猜测业务含义 | 用本体明确描述业务类、属性与语义 |
+| 依赖零散文档解释业务规则 | 将业务知识组织为可校验的 OWL/RDF 图 |
+| 模型直接面对数据库表结构 | 将业务对象类型绑定到真实数据源 |
+| 模型生成 SQL 或 API 调用后直接执行 | 先形成声明式动作提案，再经过审批与校验 |
+| 每个新功能都可能侵入 Agent 主循环 | 通过插件扩展工具、服务、界面与数据能力 |
 
-## 📊 One workbench for business data
+**本体不是一段更长的 Prompt。** 它是企业业务语义的结构化表达，也是连接自然语言、数据对象与业务动作的中间层。
 
-<p align="center">
-  <img src="./docs/assets/readme/data-analysis.png" alt="The data analysis workbench: datasets from files, databases, and REST APIs, with charts and AI analysis" width="100%" />
-</p>
+## 🚀 核心能力
 
-The `dsh-data-analysis` bundle turns the web client into an analysis workbench: import CSV or Excel, connect databases and REST APIs into datasets, and query everything with a safe DSL.
+### 1. 企业本体引擎（Ontology Engine）
 
-- **One place for enterprise data** — files, database connections, and REST sources land as datasets the sidebar can browse, chart, and diff.
-- **The agent reads the same numbers** — the model queries the dataset through tools instead of pasting rows into the prompt, so an analysis is reproducible instead of lucky.
-- **Charts where the work happens** — saved charts sit next to the data, and every dataset keeps its source mapping for the next refresh.
+将企业业务知识转化为 Agent 可以理解和使用的结构化语义上下文。
 
-## 🔌 Mainstream ERP adapters
+- 支持 Turtle 格式的 OWL/RDF 本体文件。
+- 解析业务类、属性及其语义描述。
+- 按业务领域组织本体，例如合同、采购等。
+- 将本体摘要注入 Agent 上下文，减少模型对业务含义的猜测。
+- 通过 RDF 图存储本体，并从存储结果重建注入摘要。
+- 本体发布前执行结构校验。
 
-<p align="center">
-  <img src="./docs/assets/readme/erp-workbench.png" alt="The ERP workbench: connections, action mappings, and one test call" width="100%" />
-</p>
+![本体知识图谱](docs/assets/readme/ontology-graph.png)
 
-The ERP connector is a standalone Node router with Zod schemas, an adapter registry, and a transformer pipeline — the workbench page is its way in from the product.
+### 2. 业务对象绑定（Business Object Binding）
 
-- **Yonyou U8 (v13/v15) and Kingdee Cloud Galaxy** ship as adapter skeletons, and a new ERP family is a new adapter plus a schema, not a fork.
-- **The mapping editor pairs ontology actions with ERP APIs** — inline transformer specs, a live JSON preview, and one test call before anything real runs.
-- **Nothing writes without a proposal** — the connector only executes actions the ontology declared and the visitor approved.
+让本体中的业务对象与真实数据建立联系。
 
-## 🧩 And the rest of the harness
+- 对象类型可绑定 CSV 或 REST 数据源。
+- 声明主键与字段映射。
+- 将数据映射为具有业务语义的对象，而不是让模型直接猜测数据库表。
+- 同步过程以事务方式执行，并保留运行历史。
 
-<p align="center">
-  <img src="./docs/assets/readme/quadnest-memory.png" alt="QuadNest: a companion's layered memory panel beside the stage" width="49.5%" />
-  <img src="./docs/assets/readme/admin.png" alt="The admin console: accounts, roles, and per-resource grants" width="49.5%" />
-</p>
+### 3. 声明式业务动作（Declarative Business Actions）
 
-| Capability | What it does |
-|------------|--------------|
-| 🧩 **Plugin-First Architecture** | Every seam — slots, waterfall listeners, services, projections — is a registered effect. No agent-loop code changes to extend behavior. |
-| 🪺 **QuadNest micro-metaverse** | Four companion robots (星伴 / 溯游 / 灵旅 / 隅友） share one private stage with layered memory: persona, reflections, facts, and a recent window — raw transcripts stay in a journal, never re-enter the prompt. |
-| 🔐 **Local Accounts** | Every browser request needs a signed-in local account; there is no platform account to link. Accounts, roles, and per-resource grants live in a SQLite directory. |
-| 👑 **Admin Workbench** | An admin role bypasses resource policy and adds a user-management panel: create, rename, reset, promote, and delete accounts, then grant `owner`/`author`/`reviewer`/`publisher`/`viewer` roles — with multi-select resource grants. |
-| 🖥️ **Mapping Editor** | A React + Vite visual editor that pairs ontology actions with ERP API mappings, with inline transformer specs and a live JSON preview. |
-| 🧭 **Dual UI** | Web and Desktop frontends share one client package set, so a panel written once renders in both shells. |
-| 🐍 **Python SDK** | A session-projected mirror of the TypeScript loop — the same `SessionEventMap`, the same expected outputs, and the same persistence format. |
-| 🛡️ **Safety First** | Plugin-level sandboxing, a credential boundary, versioned session formats, structural validation before an ontology version is published, and an explicit safety notice before the first run. |
+让 Agent 不只回答“应该怎么做”，还能够提出结构化的业务操作方案。
 
-Access is decided before any page renders: without a signed session the index answers `303` to `/login`, and only `admin` sees the management surface:
+- 声明动作参数、前置条件与预期影响。
+- Agent 负责理解意图并生成动作提案。
+- 提案记录变更前后值、阻断条件及关联对象。
+- 写操作需要人工审批。
+- 提交时重新检查前置条件，降低业务状态变化带来的风险。
 
-<p align="center">
-  <img src="./docs/assets/readme/local-access.svg" alt="Local sign-in gate, account directory, role check, and admin full access" width="100%" />
-</p>
+**设计原则：AI 可以提出行动，但不能绕过授权替人批准。**
 
-## 🧭 Architecture at a glance
+### 4. ERP 连接层（ERP Integration）
 
-<p align="center">
-  <img src="./docs/assets/readme/architecture.svg" alt="OpenHarness architecture: frontends, harness core, and plugin seams" width="100%" />
-</p>
+为企业本体动作与 ERP 系统之间建立可扩展的连接机制。
 
-One request crosses three layers, and nothing in the middle special-cases the ends:
+- 独立 ERP Router，降低 ERP 接口与 Agent 核心之间的耦合。
+- 基于 Schema 的配置校验。
+- 适配器注册机制，便于扩展不同 ERP 厂商和版本。
+- Transformer 管道用于业务字段与接口数据转换。
+- 当前仓库包含用友 U8（v13/v15）与金蝶云·星空适配器骨架。
+- 提供可视化映射编辑器，将本体动作与 ERP API 映射关联，并支持转换配置和 JSON 预览。
 
-- **Frontends** — the Vite + React Web client at `http://127.0.0.1:3080` and the Electron desktop shell share a single set of client packages: sidebar panels, tool cards, and settings are slot contributions.
-- **Harness core** — the webserver and API inject the client module graph and serve the `auth` and `admin` routes, the agent loop owns model requests and tool calls, and the session log keeps every model-visible input reconstructable.
-- **Capability seams** — shell, filesystem, web search, subagents, jobs, MCP, the ontology injector, the ERP connector, and the data-analysis bundle all attach without touching the loop.
+> ERP 适配器的实际可用范围取决于对应版本的接口实现、部署环境与企业侧配置。请勿将适配器骨架理解为对所有 ERP 功能的完整覆盖。
 
-## 🚀 Quick start
+### 5. 企业数据分析（Data Analysis）
 
-### Prerequisites
+将数据分析能力作为可安装的能力包接入 Agent 工作环境。
 
-- Node.js ≥ **24.9.0**
-- pnpm ≥ **11.28**
+- 通过 `dsh-data-analysis` profile bundle 扩展分析工具。
+- 在 Web 客户端中提供对应的分析入口和侧边栏面板。
+- 采用插件化方式集成，避免将分析功能硬编码进 Agent 主循环。
+- 可与本体业务语义结合，为面向业务对象的数据分析提供基础。
 
-### Install & Run
+### 6. 企业用户与权限管理（Identity & RBAC）
 
-```sh
-git clone https://github.com/jeokeo011222/Openharness.git
-cd Openharness
-pnpm install
-pnpm run build
-pnpm run dev:web          # http://127.0.0.1:3080
+提供本地账号体系与管理员工作台。
+
+- 本地账号、角色和资源授权存储于 SQLite。
+- 浏览器访问需要有效的本地登录会话。
+- 管理员可在工作台中管理用户及授权。
+- 支持按工作区或会话分配 `owner`、`author`、`reviewer`、`publisher`、`viewer` 等角色。
+- 管理界面根据当前会话角色展示相应能力。
+
+![管理控制台](docs/assets/readme/admin.png)
+
+### 7. Web + Desktop 双端体验
+
+- Web 客户端基于 Vite + React。
+- Electron 提供桌面应用外壳。
+- 两端共享客户端包，面板、工具卡片和设置项通过扩展点贡献。
+- 能力模块可在统一的 Agent 运行环境中复用。
+
+
+### 8. 可扩展的 Agent Harness
+
+OpenHarness 延续插件优先的架构理念。模型提供方、工具、存储、客户端和业务能力通过明确的扩展点注册。
+
+新增能力优先采用插件或能力包实现，尽量避免修改 Agent Loop 本身。
+
+---
+
+## 🧭 系统架构
+
+一次企业任务可以抽象为以下链路：
+
+```mermaid
+flowchart TD
+    U["用户 / 企业员工"] --> UI["Web UI / Electron"]
+    UI --> H["OpenHarness Agent Harness"]
+    H --> LLM["LLM Provider"]
+    H --> O["Ontology Injector"]
+    O --> RDF["OWL / RDF Ontology"]
+    O --> G["RDF Graph Store"]
+    H --> B["Business Object Binding"]
+    B --> D["CSV / REST Data Sources"]
+    H --> A["Data Analysis Bundle"]
+    H --> P["Declarative Action Proposal"]
+    P --> R{"人工审批"}
+    R -->|批准| E["ERP Connector / Router"]
+    R -->|拒绝| X["终止或修改提案"]
+    E --> M["ERP Adapter"]
+    M --> ERP["Yonyou U8 / Kingdee 等 ERP"]
 ```
 
-One-command alternative if you already have a key:
+### 三层架构
 
-```sh
-DEEPSEEK_API_KEY=... pnpm dsh web
+| 层次 | 主要职责 |
+|---|---|
+| 交互层 | Web、Desktop、登录认证、管理员工作台、工具与业务面板 |
+| Agent Harness 层 | 模型调用、Agent Loop、会话管理、工具执行、上下文注入与权限边界 |
+| 企业能力层 | 本体引擎、业务对象绑定、数据分析、声明式动作、ERP 连接器 |
+
+### 本体驱动的业务执行链
+
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant Agent as OpenHarness Agent
+    participant Ontology as 企业本体
+    participant Data as 业务数据
+    participant Approval as 人工审批
+    participant ERP as ERP 系统
+
+    User->>Agent: 用自然语言提出业务问题
+    Agent->>Ontology: 获取业务类、属性与规则上下文
+    Ontology-->>Agent: 返回结构化业务语义
+    Agent->>Data: 查询已绑定的业务对象
+    Data-->>Agent: 返回业务对象数据
+    Agent->>Agent: 分析并生成动作提案
+    Agent-->>User: 展示分析结果与拟执行变更
+    User->>Approval: 审核并批准
+    Approval->>ERP: 通过连接器提交动作
+    ERP-->>User: 返回执行结果
 ```
 
-The first browser visit lands on `/login`; register an account there, or sign in with the administrator credentials configured in your profile's `cordis.patch.yml`.
+## 🧠 一个典型场景
 
-## 📂 Monorepo layout
+假设企业员工提出：
 
-```
-Openharness/
+> “帮我检查本月待处理采购合同，找出金额异常或审批信息不完整的记录，并准备需要补充的信息。”
+
+在具备相应本体、数据绑定和工具配置的情况下，OpenHarness 可以沿着以下路径工作：
+
+1. **理解业务概念**：通过采购合同本体识别合同、供应商、金额、审批状态等业务概念。
+2. **定位业务对象**：根据对象绑定配置查询真实业务记录。
+3. **执行数据分析**：识别异常金额、缺失字段或不完整的业务信息。
+4. **生成分析结果**：以业务语义组织结果，而不是只返回一堆数据库字段。
+5. **准备业务动作**：在需要修改业务数据时，生成包含参数、前置条件和预期影响的动作提案。
+6. **人工审核**：由有权限的人员检查并批准。
+7. **连接 ERP**：通过配置好的 ERP 适配器执行获批操作。
+
+这是一种架构工作流示例。实际可执行范围取决于已发布的本体、数据源、ERP 适配器和权限配置。
+
+## 🔐 安全与治理设计
+
+企业级 AI 不仅需要能力，还需要明确的执行边界。
+
+OpenHarness 在当前实现中包含以下设计：
+
+- **本地身份体系**：账号和授权由本地目录管理。
+- **资源级角色授权**：按工作区或会话控制不同角色的访问范围。
+- **动作审批机制**：Agent 提出写操作，人工审批后才能提交。
+- **提交前重新校验**：执行阶段重新检查动作前置条件。
+- **凭据边界**：ERP 凭据保存在本地配置覆盖层中，不应提交到代码仓库。
+- **本体结构校验**：本体发布前执行结构检查。
+- **会话可重建性**：保留模型可见输入与会话事件，便于检查执行过程。
+
+> 安全能力仍需结合实际部署方式、网络边界、密钥管理、备份策略和企业权限制度进行整体评估。上线前请阅读项目安全说明，并在隔离环境中完成测试。
+
+## 🧰 技术栈
+
+| 领域 | 技术 |
+|---|---|
+| Agent Runtime | DeepSeek Harness / Cordis |
+| 主要开发语言 | TypeScript（strict mode） |
+| 本体表达 | OWL / RDF / Turtle |
+| RDF 图存储 | Oxigraph |
+| RDF 解析 | rdflib |
+| 配置与结构校验 | Zod / Schemastery |
+| Web UI | Vite / React |
+| Desktop | Electron |
+| 本地身份与权限数据 | SQLite |
+| Python 能力 | Python SDK |
+| Monorepo | pnpm workspaces |
+
+## 📦 仓库结构
+
+```text
+OpenHarness/
 ├── apps/
-│   ├── web/              # Vite + React web client
-│   └── desktop/          # Electron desktop wrapper
-├── packages/             # 50+ workspace packages, grouped by concern
-│   ├── core/             # Agent/session API
-│   ├── llm/              # Model providers
-│   ├── identity/         # Local account directory (SQLite) + admin routes
-│   ├── ontology-injector/   # OWL/RDF → agent context + inference
-│   ├── ...               # shell, fs, web, subagent, session, mcp…
-│   └── experimental/     # capabilities without product-support commitment
-├── data-analysis/        # dsh-data-analysis workbench bundle
-├── erp-connector/        # Standalone ERP router (Yonyou / Kingdee adapters)
-├── erp-workbench/        # The connector's product page: connections, mappings, test call
-├── erp-mapping-editor/   # React + Vite visual mapping editor
-├── ontology-store/       # Embedded RDF graph database (graph.db.nq) + uploaded sources
-├── ontology-rag/         # Retrieval-augmented service over published ontologies
-├── quadnest/             # dsh-quadnest: the four-companion micro-metaverse bundle
-├── vendor/               # Vendored Cordis source (MIT, see vendor/README.md)
-├── native/               # Node addon system
-└── website/              # VitePress documentation
+│   ├── web/                  # Web 客户端
+│   └── desktop/              # Electron 桌面端
+├── packages/                 # Agent Harness 与扩展能力包
+│   ├── core/                 # Agent / Session 核心
+│   ├── llm/                  # 模型提供方
+│   ├── identity/             # 本地账号、角色与管理路由
+│   ├── ontology-injector/    # OWL/RDF 本体上下文注入
+│   └── ...                   # 工具、会话、MCP 等扩展
+├── ontology-store/           # RDF 图存储
+├── ontology-rag/             # 本体相关检索能力
+├── data-analysis/            # 数据分析能力包
+├── erp-connector/            # ERP Router 与适配器
+├── erp-mapping-editor/       # ERP 映射编辑器
+├── erp-workbench/            # ERP 工作台
+├── python/                   # Python 相关能力
+├── docs/                     # 项目文档
+├── website/                  # 文档网站
+└── native/                   # Native 扩展
 ```
 
-## 🛠️ Built with
+## 🚀 快速开始
 
-- [Cordis](https://github.com/cordiverse/cordis) — spatiotemporal composability runtime
-- [TypeScript](https://www.typescriptlang.org/) `strict: true`, ESM everywhere
-- [oxigraph](https://github.com/oxigraph/oxigraph) — embedded RDF graph database holding ontologies
-- [rdflib](https://github.com/linkeddata/rdflib.js) — embedded RDF/OWL parser for the Turtle vocabulary
-- [Zod](https://zod.dev/) + [Schemastery](https://github.com/cordiverse/schemastery) — config validation
-- [Vite](https://vite.dev/) + [Electron](https://www.electronjs.org/) — dual-frontend stack
-- [pnpm workspaces](https://pnpm.io/workspaces) — monorepo
+### 环境要求
 
-## ❓ FAQ
+- Node.js `>= 24.9.0`
+- pnpm `>= 11.28`
 
-**Q: Is OpenHarness production-ready?** It is a developer preview: public APIs are pre-stable and versions can break between releases, so read the matching upgrade guide before upgrading.
+### 1. 克隆项目
 
-**Q: Which model providers are supported?** Any provider with an OpenAI-compatible endpoint works through the DeepSeek SDK surface; native providers and remote BFF adapters live in `packages/llm/`.
+```bash
+git clone https://github.com/jeokeo011222/OpenHarness.git
+cd OpenHarness
+```
 
-**Q: Can I use OpenHarness without the ontology or ERP features?** Yes — the ontology injector, the ERP connector, and the analysis bundle are optional plugins. The base harness ships the plugin-first agent/session primitives and the full dual UI stack.
+### 2. 安装依赖
 
-**Q: Where does my ERP data live?** OpenHarness stores no ERP records. The connector is a stateless router that delegates to configured adapters, and credentials stay in local `cordis.yml` overlays that are never committed.
+```bash
+pnpm install
+```
 
-## 🏷️ Keywords
+### 3. 构建项目
 
-Enterprise ontology · OWL/RDF · Knowledge graph · Data analysis · ERP connector · Yonyou U8 · Kingdee Cloud Galaxy · Ontology actions · Agent harness · MCP · Plugin architecture · TypeScript · Electron · Local accounts · RBAC · SQLite · Python SDK
+```bash
+pnpm run build
+```
 
-## 🤝 Contributing
+### 4. 启动 Web 开发环境
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development conventions, gates, and the plugin authoring guide. Plugins, adapters, and documentation fixes are all welcome.
+```bash
+pnpm run dev:web
+```
 
-> Every new plugin declaration goes through `ctx.effect()`; every capability is a service definition, a service provider, and a consumer — never a hidden singleton.
+默认访问地址：
 
-## 🙏 Acknowledgements
+```text
+http://127.0.0.1:3080
+```
 
-Special thanks to **[DeepSeek](https://www.deepseek.com/)**.
+### 5. 配置模型
 
-OpenHarness is designed, built, and verified against DeepSeek's open models and API every day — the workbench you see above, every plugin panel, the ontology pipeline, and the ERP calls were all driven end to end by DeepSeek during development. Its fast, capable, and open model family is what makes a self-hostable enterprise agent harness practical instead of theoretical. 谢谢 DeepSeek！
+根据所使用的模型提供方配置相应 API Key 和模型参数。若使用 DeepSeek API，可按项目配置方式提供 `DEEPSEEK_API_KEY`。
+
+```bash
+DEEPSEEK_API_KEY=your_api_key pnpm dsh web
+```
+
+首次访问 Web UI 时，按页面提示注册本地账号，或使用项目 profile 中配置的管理员凭据登录。
+
+> 具体配置项请以当前分支的配置文件和文档为准。请勿将 API Key、ERP 密码或其他生产凭据提交到 Git。
+
+## 🗺️ 项目方向
+
+OpenHarness 希望探索一条更适合企业场景的 Agent 技术路线：
+
+1. **从 Prompt Engineering 走向 Ontology Engineering**：让企业业务知识拥有结构化、可校验、可复用的表达。
+2. **从 RAG 走向 Semantic Context**：不只检索相关文本，还要让业务对象、属性与关系参与 Agent 推理。
+3. **从数据问答走向业务对象智能**：让模型围绕企业对象开展分析，而不是只面对孤立的数据表。
+4. **从工具调用走向受治理的业务动作**：把动作参数、前置条件、审批和执行边界纳入统一流程。
+5. **从单体 Agent 走向可组合的企业能力平台**：通过插件扩展模型、工具、数据、ERP 与交互界面。
+
+我们的长期目标是让企业能够逐步构建自己的**可理解、可连接、可治理、可扩展的 AI 业务运行环境**。
+
+## ⚠️ 项目状态
+
+OpenHarness 当前处于持续开发与验证阶段。部分接口、插件和 ERP 适配能力可能继续演进，版本升级也可能带来兼容性变化。
+
+- 请在测试环境中验证功能，再评估生产部署。
+- ERP 连接能力取决于具体适配器实现和企业接口权限。
+- 不要在未经审批的情况下开放高风险业务写操作。
+- 请阅读仓库中的安全说明、贡献指南和第三方依赖声明。
+
+## 🤝 参与贡献
+
+欢迎对企业本体、Agent Harness、数据分析、ERP 适配器、权限治理和开发者体验感兴趣的开发者参与。
+
+你可以通过以下方式贡献：
+
+- 提交 Issue，反馈问题或提出功能建议。
+- 提交 Pull Request，改进代码、文档或测试。
+- 开发新的本体领域模型或数据源适配器。
+- 扩展 ERP Adapter 与数据转换器。
+- 完善示例、测试用例和部署文档。
+
+开始之前，请阅读仓库中的 `CONTRIBUTING.md`。
 
 ## 📄 License
 
-[Apache-2.0](LICENSE)
+本项目采用 [Apache License 2.0](./LICENSE)。第三方依赖及其许可证信息请参阅 `THIRD_PARTY_NOTICES.md`。
 
-Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md); the vendored Cordis source under `vendor/` remains MIT, as its upstream authors licensed it.
+---
+
+<div align="center">
+
+**OpenHarness — Give AI a Model of Your Business.**
+
+让 AI 理解企业，让数据产生业务语义，让智能连接真实业务。
+
+如果 OpenHarness 对你有帮助，欢迎 Star ⭐、Fork 和参与共建。
+
+</div>

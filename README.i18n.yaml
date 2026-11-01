@@ -2,48 +2,99 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write README.md
+/:
+  en: f783038c7258d592
+  zh: f783038c7258d592
 /ontology-openharness:
-  en: 8e8d5a23405c64d1
-  zh: e5df7b3420f5f0e1
-/ontology-openharness/why-openharness:
-  en: 69f085b4157121e0
-  zh: 323bbf664136ec74
-/ontology-openharness/architecture-at-a-glance:
-  en: 318614b78e266a69
-  zh: c86d5cddf162cc6a
-/ontology-openharness/core-features:
-  en: 1cf199d886dbe05b
-  zh: d04ad12a5e66c2a0
-/ontology-openharness/ontology-injection-pipeline:
-  en: 39ff6be4e6061af8
-  zh: 575d5272e40161da
-/ontology-openharness/local-accounts-and-the-admin-workbench:
-  en: cc6e4d8d88fa47a2
-  zh: 8df52a0d8a2ee91e
-/ontology-openharness/quick-start:
-  en: 51ed2d6bea3c2526
+  en: 38c924a6b62661a0
+  zh: 78c9d6839a81afdd
+/ontology-openharness/ai:
+  en: 3ef667df9c499df9
+  zh: 3ef667df9c499df9
+/ontology-openharness/openharness:
+  en: 28714f39d9f393c2
+  zh: 28714f39d9f393c2
+/ontology-openharness/ontology-driven:
+  en: d6d53b70500f0a87
+  zh: d6d53b70500f0a87
+/ontology-openharness/section:
+  en: 110418d372c5adae
+  zh: 110418d372c5adae
+/ontology-openharness/section/1-ontology-engine:
+  en: 3966683b9843fd9f
+  zh: 3966683b9843fd9f
+/ontology-openharness/section/2-business-object-binding:
+  en: 7ee04595e4b3b229
+  zh: 7ee04595e4b3b229
+/ontology-openharness/section/3-declarative-business-actions:
+  en: a2fb808b9c12b762
+  zh: a2fb808b9c12b762
+/ontology-openharness/section/4-erp-erp-integration:
+  en: 656a2f0d895cdaf7
+  zh: 656a2f0d895cdaf7
+/ontology-openharness/section/5-data-analysis:
+  en: ad2585fcb6770913
+  zh: ad2585fcb6770913
+/ontology-openharness/section/6-identity-rbac:
+  en: b4af7c71cc962aa7
+  zh: b4af7c71cc962aa7
+/ontology-openharness/section/7-web-desktop:
+  en: c78f485590b9b821
+  zh: c78f485590b9b821
+/ontology-openharness/section/8-agent-harness:
+  en: 53fc290e6d664c5d
+  zh: 53fc290e6d664c5d
+/ontology-openharness/section~2:
+  en: 64807eb7c5a78413
+  zh: 64807eb7c5a78413
+/ontology-openharness/section/section:
+  en: b7779d57dd0bc870
+  zh: b7779d57dd0bc870
+/ontology-openharness/section/section~2:
+  en: 81d953c6b5c736aa
+  zh: 81d953c6b5c736aa
+/ontology-openharness/section~3:
+  en: 5c2594e9c284c984
+  zh: 5c2594e9c284c984
+/ontology-openharness/section~4:
+  en: 6e3b1f74e09b2ab5
+  zh: 6e3b1f74e09b2ab5
+/ontology-openharness/section~5:
+  en: 46bfa0f520ccce52
+  zh: 46bfa0f520ccce52
+/ontology-openharness/section~6:
+  en: 91e8bcb920d9d349
+  zh: 91e8bcb920d9d349
+/ontology-openharness/section~7:
+  en: 041de6b4cd4d0f81
   zh: 041de6b4cd4d0f81
-/ontology-openharness/quick-start/prerequisites:
-  en: 24ab104a19daa1fc
-  zh: 7f92cebeff0ee670
-/ontology-openharness/quick-start/install-run:
-  en: 67f4364ea17094e4
-  zh: 15556ea81b29df90
-/ontology-openharness/monorepo-layout:
-  en: 38f48d656ac26668
-  zh: af157ae6dc821300
-/ontology-openharness/built-with:
-  en: 70302e9af20e792d
-  zh: bbacdba276e21216
-/ontology-openharness/faq:
-  en: cf2b3bbbc175b16b
-  zh: 964b764c1ba1dc3b
-/ontology-openharness/keywords:
-  en: 5d523c3fcf05da58
-  zh: 3e69cc874b8391a1
-/ontology-openharness/contributing:
-  en: 4849b2a83e0bacd1
-  zh: f14f37bb1a5e3357
+/ontology-openharness/section/section~3:
+  en: 9eda5bf0752451de
+  zh: 9eda5bf0752451de
+/ontology-openharness/section/1:
+  en: 2a4d76fb6b0edcde
+  zh: 2a4d76fb6b0edcde
+/ontology-openharness/section/2:
+  en: 7d563fbf9d702d7a
+  zh: 7d563fbf9d702d7a
+/ontology-openharness/section/3:
+  en: 3eb9a3392634d546
+  zh: 3eb9a3392634d546
+/ontology-openharness/section/4-web:
+  en: 8c596c797cf47be4
+  zh: 8c596c797cf47be4
+/ontology-openharness/section/5:
+  en: d037584b94f75805
+  zh: d037584b94f75805
+/ontology-openharness/section~8:
+  en: 30b45c5842aa2d72
+  zh: 30b45c5842aa2d72
+/ontology-openharness/section~9:
+  en: 6b35e085271728d2
+  zh: 6b35e085271728d2
+/ontology-openharness/section~10:
+  en: 252c187bddf087b1
+  zh: 252c187bddf087b1
 /ontology-openharness/license:
-  en: d92c9d0d1f4ae5f4
-  zh: fd2748aad96d5631
+  en: 7e0b61a9f425c92a
+  zh: 7e0b61a9f425c92a

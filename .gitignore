@@ -48,6 +48,7 @@ apps/web/dist/
 .pytest_cache/
 **/.venv/
 .orig
+.修改
 .worktrees/
 worktrees/
 .agents/worktrees/
